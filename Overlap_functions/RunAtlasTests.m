@@ -1,0 +1,563 @@
+%Generates a test fMRI data set and compares the performance of a variety
+%of node discovery algorithms
+% In this case simulates an atlas and a mode mixing matrix to test the two
+% step sICA / tICA approach
+
+% fsl_sub -q verylong.q matlab -singleCompThread -nojvm -nosplash -nodisplay \< RunTests.m
+% samh@jalapeno18 $ /opt/fmrib/MATLAB/R2014a/bin/matlab -nojvm -nosplash -nodisplay -r RunAtlasTests
+
+close all; clear all; clc
+
+restoredefaultpath
+addpath(genpath('~samh/Documents/Code/Simulated_fMRI_Tests/'))
+addpath(genpath('~samh/Documents/Code/MATLAB/'))
+addpath(genpath('~samh/Documents/Code/Algorithms/'))
+addpath('~samh/Documents/Code/VBGP_Tests/')
+addpath('DataGeneration/'); addpath('Methods/');
+addpath('Scoring/'); addpath('Visualisation/')
+
+rng('shuffle')
+
+fileName = 'Results/PFMsims2'
+
+plotFigures = false;
+if plotFigures
+    prettyFigures()
+end
+
+%% Set size of problem
+
+%Number of times to repeat simulation / test cycle
+params.nRepeats = 10;
+
+%Details of scans
+params.S = 30;       %Subjects
+params.R = 4*ones(params.S,1);   %Repeats
+
+params.T = 1200;     %No. of time points per fMRI scan
+params.TR = 0.72;
+params.dt = 0.1;     %Neural sampling rate
+%Amount of neural points to simulate - more than scan length so don't have
+%to zero pad HRF at start of scan
+params.Tn = ceil(1.25 * params.T * params.TR / params.dt);
+
+%% Set size of atlas / mode matrix
+
+atlasParams = params;
+modeParams = params;
+
+atlasParams.V = 12500;     %Voxels
+atlasParams.N = 200;      %Number of nodes in the atlas
+
+modeParams.V = atlasParams.N;
+modeParams.N = 25;        %Number of modes
+
+params.N = modeParams.N;
+params.V = atlasParams.V;
+
+%Number of modes to infer
+params.iN = 15
+%params.iN = 25
+%params.iN = 40
+
+%% Set the details of the tests we want to do
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Atlas
+
+atlasOptions.P.form = 'Additive';
+
+%Choose form for Pg
+atlasOptions.Pg.form = 'BlockAtlas';
+atlasOptions.Pg.widthPrecision = 25;
+
+%Choose form for Ps
+atlasOptions.Ps.form = 'Null';
+atlasOptions.P.registration.form = 'RandomSmooth';
+atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N); %0.015 * params.V;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Modes
+
+modeOptions.P.form = 'Additive';
+
+%Choose form for Pg
+modeOptions.Pg.form = 'BiasedBoxcar';
+modeOptions.P.nBlocks = 4;
+modeOptions.P.p = 2.0 / params.N;
+modeOptions.P.pVar = 0.00075;
+modeOptions.P.pPosBlock = 0.7;
+modeOptions.P.smootherWidth = floor( 0.01*modeParams.V );
+modeOptions.P.minWeight = 0.5;
+modeOptions.P.weightRange.a = 3;
+modeOptions.P.weightRange.b = 2;
+modeOptions.P.biasStrength = 0.75;
+
+%Choose form for Ps
+modeOptions.Ps.form = 'SS';
+modeOptions.P.PsPg = 0.5; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
+%Set options based on that choice
+switch modeOptions.Ps.form
+    
+    case 'SS'
+        modeOptions.Ps.rot = 0.5;     %1;
+        modeOptions.Ps.p = 0.25;      %0.1;
+        modeOptions.Ps.sigma = 1;
+        modeOptions.Ps.epsilon = 0.1;
+        
+    case 'Gaussian'
+        
+    case 'Null'
+end
+
+%Choose registration errors
+modeOptions.P.registration.form = 'Null';
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Time courses
+options.An.form = 'Freq';
+options.An.offRate = 0.25 * 1/params.N;
+switch options.An.form
+    case 'Freq';
+        options.An.rot = 0.3;
+        options.An.rotS = 0.5;
+        options.An.rotR = 0.1;
+        options.An.p = 0.2;
+        options.An.fc = 0.1; %in Hz
+        options.An.fAmp = 2;
+        options.An.epsilon = 0.1;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%BOLD signal
+options.BS.form = 'SaturatingFlobsHRF';
+switch options.BS.form
+    case 'Linear'
+        
+    case 'FlobsHRF'
+        options.BS.HRFcoeffs.mu = [1 0 0];
+        options.BS.HRFcoeffs.sigma = [0.1 0.1 0.1];
+        
+    case 'SaturatingFlobsHRF'
+        options.BS.HRFcoeffs.mu = [1 0 0];
+        options.BS.HRFcoeffs.sigma = [0.1 0.1 0.1];
+        options.BS.tanhPercentile = 99;
+        options.BS.tanhMax = 0.9;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Noise
+
+%Signal to noise ratio (expressed in terms of power)
+options.D.SNR = 0.1;
+
+%Type
+options.D.noise.form = 'SpatiotemporallyWhiteTdist';
+switch options.D.noise.form
+    case 'SpatiotemporallyWhiteGaussian'
+        
+    case 'SpatiotemporallyWhiteTdist'
+        options.D.noise.a = 8;
+        options.D.noise.b = 8;
+end
+
+
+%% Run the tests
+
+for n = 1:params.nRepeats
+    
+    %% Generate data
+    
+    if plotFigures && (n==1)
+        plotNow = true;
+    else
+        plotNow = false;
+    end
+    
+    atlasP = generateMaps(atlasParams, atlasOptions, plotNow);
+    
+    [modeP, plotMaps] = generateMaps(modeParams, modeOptions, plotNow);
+    
+    %Combine to make full maps
+    P = cell(params.S,1);
+    for s = 1:params.S
+        P{s} = atlasP{s} * modeP{s};
+    end
+    %Plot if requested
+    if plotNow
+        plotMaps(P, params, options);
+    end
+    
+    An = generateNeuralTimecourses(params, options, plotNow);
+    
+    PA = generateBoldSignal(P, An, params, options, plotNow);
+    
+    D = generateData(PA, params, options, plotNow);
+    
+    
+    %Finally, add a global rescaling such that all scans are overall
+    %unit variance
+    vD = 0;
+    for s = 1:params.S
+        for r = 1:params.R(s)
+            vD = vD + var(D{s}{r}(:));
+        end
+    end
+    vD = vD / sum(params.R);
+    for s = 1:params.S
+        for r = 1:params.R(s)
+            D{s}{r} = D{s}{r} / sqrt(vD);
+            PA{s}{r} = PA{s}{r} / sqrt(vD);
+        end
+    end
+    
+    if plotFigures
+        cP = P{1}' * P{1};
+        cP = cP ./ sqrt(diag(cP)*diag(cP)');
+        figure; imagesc(cP, [-1 1]); colorbar; colormap(bluewhitered)
+        xlabel('Mode'); ylabel('Mode');
+        axis square
+        set(gcf, 'Position', [200 200 500 400])
+        
+        cA = [An{1}{1} An{1}{2} An{1}{3} An{1}{4}] * [An{1}{1} An{1}{2} An{1}{3} An{1}{4}]';
+        cA = cA ./ sqrt(diag(cA)*diag(cA)');
+        figure; imagesc(cA, [-1 1]); colorbar; colormap(bluewhitered)
+        xlabel('Mode'); ylabel('Mode');
+        axis square
+        set(gcf, 'Position', [200 200 500 400])
+    end
+    
+    %% Look at ground truth accuracy in the PA subspace
+    % This looks at how well the linear mixing model can do, in the best
+    % case scenario
+    
+    %Extract mean group map
+    Pg = 0;
+    for s = 1:params.S
+        Pg = Pg + P{s};
+    end
+    Pg = Pg / params.S;
+    
+    %Use the group and the subject specific maps to regress the timecourses
+    %out of the BOLD signal (noise free)
+    A = cell(params.S,1); Ag = cell(params.S,1);
+    for s = 1:params.S
+        A{s} = cell(params.R(s),1); Ag{s} = cell(params.R(s),1);
+        for r = 1:params.R(s)
+            Ag{s}{r} = Pg \ PA{s}{r};
+            A{s}{r} = P{s} \ PA{s}{r};
+        end
+    end
+    
+    %Save scores
+    %Ground truth linear model
+    scores.GT.PA(n) = calculateBoldRecovery(PA, makePA(P,A,params), params);
+    
+    %Ground truth mean map model
+    scores.GTg.PA(n) = calculateBoldRecovery(PA, ...
+        makePA(repmat({Pg},params.S,1),Ag,params), params);
+    
+    %Mean map accuracy (if we are trying to find the true number of modes)
+    if params.N == params.iN
+        [scores.GTg.P(:,n), scores.GTg.A(:,n), scores.GTg.cP(:,n), ...
+            scores.GTg.cA(:,n)] = calculateDecompositionAccuracy( ...
+            P, repmat({Pg}, params.S, 1), A, Ag, params);
+    end
+    
+    %% Extract PFMs
+    
+    %For the first run, may want to plot convergence
+    if plotNow
+        %If we want to run with plots of convergence, pass in best guesses
+        %for mean map and node time courses
+        [pfmP1, pfmA1, pfmPg1] = runVBGP(D, params, params.iN, Pg, A);
+    else
+        %Just run VBGP normally
+        [pfmP1, pfmA1, pfmPg1] = runVBGP(D, params, params.iN);
+    end
+    
+    
+    %Save scores
+    scores.PFMs.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(pfmP1,pfmA1,params), params);
+    [scores.PFMs.P(:,2*(n-1)+1), scores.PFMs.A(:,2*(n-1)+1), ...
+        scores.PFMs.cP(:,2*(n-1)+1), scores.PFMs.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, pfmP1, A, pfmA1, params);
+    
+    
+    
+    %Repeat analysis
+    [pfmP2, pfmA2, pfmPg2] = runVBGP(D, params, params.iN);
+    
+    %Save scores
+    scores.PFMs.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(pfmP2,pfmA2,params), params);
+    [scores.PFMs.P(:,2*(n-1)+2), scores.PFMs.A(:,2*(n-1)+2), ...
+        scores.PFMs.cP(:,2*(n-1)+2), scores.PFMs.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, pfmP2, A, pfmA2, params);
+    
+    
+    
+    % Test - retest
+    [scores.PFMs.Ptr(:,2*(n-1)+1), scores.PFMs.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(pfmP1, pfmP2, params);
+    
+    %% Look at how well the PFM group mean does
+    
+    pfmPg1(:, std(pfmPg1)<eps) = 1e-6 * randn(params.V, sum(std(pfmPg1)<eps));
+    pfmPg2(:, std(pfmPg2)<eps) = 1e-6 * randn(params.V, sum(std(pfmPg2)<eps));
+    
+    %Extract time courses from group means
+    pfmAg1 = cell(params.S,1); pfmAg2 = cell(params.S,1);
+    for s = 1:params.S
+        pfmAg1{s} = cell(params.R(s),1); pfmAg2{s} = cell(params.R(s),1);
+        for r = 1:params.R(s)
+            pfmAg1{s}{r} = pfmPg1 \ D{s}{r};
+            pfmAg2{s}{r} = pfmPg2 \ D{s}{r};
+        end
+    end
+    pfmPg1 = repmat({pfmPg1},params.S,1); pfmPg2 = repmat({pfmPg2},params.S,1);
+    
+    %Save scores
+    scores.PFMg.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(pfmPg1,pfmAg1,params), params);
+    [scores.PFMg.P(:,2*(n-1)+1), scores.PFMg.A(:,2*(n-1)+1), ...
+        scores.PFMg.cP(:,2*(n-1)+1), scores.PFMg.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, pfmPg1, A, pfmAg1, params);
+    
+    scores.PFMg.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(pfmPg2,pfmAg2,params), params);
+    [scores.PFMg.P(:,2*(n-1)+2), scores.PFMg.A(:,2*(n-1)+2), ...
+        scores.PFMg.cP(:,2*(n-1)+2), scores.PFMg.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, pfmPg2, A, pfmAg2, params);
+    
+    % Test - retest
+    [scores.PFMg.Ptr(:,2*(n-1)+1), scores.PFMg.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(pfmPg1, pfmPg2, params);
+    
+    %% And now with dual regression
+    
+    [pfmPg1_DR, pfmAg1_DR] = runDR(D, pfmAg1, params);
+    [pfmPg2_DR, pfmAg2_DR] = runDR(D, pfmAg2, params);
+    
+    
+    %Save scores
+    scores.PFMg_DR.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(pfmPg1_DR,pfmAg1_DR,params), params);
+    [scores.PFMg_DR.P(:,2*(n-1)+1), scores.PFMg_DR.A(:,2*(n-1)+1), ...
+        scores.PFMg_DR.cP(:,2*(n-1)+1), scores.PFMg_DR.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, pfmPg1_DR, A, pfmAg1_DR, params);
+    
+    scores.PFMg_DR.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(pfmPg2_DR,pfmAg2_DR,params), params);
+    [scores.PFMg_DR.P(:,2*(n-1)+2), scores.PFMg_DR.A(:,2*(n-1)+2), ...
+        scores.PFMg_DR.cP(:,2*(n-1)+2), scores.PFMg_DR.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, pfmPg2_DR, A, pfmAg2_DR, params);
+    
+    % Test - retest
+    [scores.PFMg_DR.Ptr(:,2*(n-1)+1), scores.PFMg_DR.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(pfmPg1_DR, pfmPg2_DR, params);
+    
+    
+    %% Run PCA (using SVD)
+    
+    [pcaP, pcaA, svdU, svdS, svdV] = runPCA(D, params, params.iN);
+    
+    %fprintf('Hello, Sam!! \n');
+    
+    %Save scores
+    scores.PCA.PA(n) = calculateBoldRecovery(PA, ...
+        makePA(repmat({pcaP},params.S,1),pcaA,params), params);
+    
+    [scores.PCA.P(:,n), scores.PCA.A(:,n), scores.PCA.cP(:,n), ...
+        scores.PCA.cA(:,n)] = calculateDecompositionAccuracy( ...
+        P, repmat({pcaP}, params.S, 1), A, pcaA, params);
+    
+    %% Run sICA on low dim PCA, with dual reg
+    
+    [sicaP1, sicaA1] = runSICA(svdU, svdS, svdV, params, params.iN);
+    sicaP1 = repmat({sicaP1},params.S,1);
+    
+    %Save scores
+    scores.sICA.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(sicaP1,sicaA1,params), params);
+    [scores.sICA.P(:,2*(n-1)+1), scores.sICA.A(:,2*(n-1)+1), ...
+        scores.sICA.cP(:,2*(n-1)+1), scores.sICA.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, sicaP1, A, sicaA1, params);
+    
+    %Run dual regression
+    [sicaP1_DR, sicaA1_DR] = runDR(D, sicaA1, params);
+    
+    %Save scores
+    scores.sICA_DR.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(sicaP1_DR,sicaA1_DR,params), params);
+    [scores.sICA_DR.P(:,2*(n-1)+1), scores.sICA_DR.A(:,2*(n-1)+1), ...
+        scores.sICA_DR.cP(:,2*(n-1)+1), scores.sICA_DR.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, sicaP1_DR, A, sicaA1_DR, params);
+    
+    
+    
+    %Repeat
+    [sicaP2, sicaA2] = runSICA(svdU, svdS, svdV, params, params.iN);
+    sicaP2 = repmat({sicaP2},params.S,1);
+    
+    %Save scores
+    scores.sICA.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(sicaP2,sicaA2,params), params);
+    [scores.sICA.P(:,2*(n-1)+2), scores.sICA.A(:,2*(n-1)+2), ...
+        scores.sICA.cP(:,2*(n-1)+2), scores.sICA.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, sicaP2, A, sicaA2, params);
+    
+    %Run dual regression
+    [sicaP2_DR, sicaA2_DR] = runDR(D, sicaA2, params);
+    
+    %Save scores
+    scores.sICA_DR.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(sicaP2_DR,sicaA2_DR,params), params);
+    [scores.sICA_DR.P(:,2*(n-1)+2), scores.sICA_DR.A(:,2*(n-1)+2), ...
+        scores.sICA_DR.cP(:,2*(n-1)+2), scores.sICA_DR.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, sicaP2_DR, A, sicaA2_DR, params);
+    
+    
+    
+    % Test - retest
+    [scores.sICA.Ptr(:,2*(n-1)+1), scores.sICA.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(sicaP1, sicaP2, params);
+    [scores.sICA_DR.Ptr(:,2*(n-1)+1), scores.sICA_DR.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(sicaP1_DR, sicaP2_DR, params);
+    
+    %% Run tICA on low dim PCA, with dual reg
+    
+    [ticaP1, ticaA1] = runTICA(svdU, svdS, svdV, params, params.iN);
+    ticaP1 = repmat({ticaP1},params.S,1);
+    
+    %Save scores
+    scores.tICA.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(ticaP1,ticaA1,params), params);
+    [scores.tICA.P(:,2*(n-1)+1), scores.tICA.A(:,2*(n-1)+1), ...
+        scores.tICA.cP(:,2*(n-1)+1), scores.tICA.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, ticaP1, A, ticaA1, params);
+    
+    %Run dual regression
+    [ticaP1_DR, ticaA1_DR] = runDR(D, ticaA1, params);
+    
+    %Save scores
+    scores.tICA_DR.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(ticaP1_DR,ticaA1_DR,params), params);
+    [scores.tICA_DR.P(:,2*(n-1)+1), scores.tICA_DR.A(:,2*(n-1)+1), ...
+        scores.tICA_DR.cP(:,2*(n-1)+1), scores.tICA_DR.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, ticaP1_DR, A, ticaA1_DR, params);
+    
+    
+    
+    %Repeat
+    [ticaP2, ticaA2] = runTICA(svdU, svdS, svdV, params, params.iN);
+    ticaP2 = repmat({ticaP2},params.S,1);
+    
+    %Save scores
+    scores.tICA.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(ticaP2,ticaA2,params), params);
+    [scores.tICA.P(:,2*(n-1)+2), scores.tICA.A(:,2*(n-1)+2), ...
+        scores.tICA.cP(:,2*(n-1)+2), scores.tICA.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, ticaP2, A, ticaA2, params);
+    
+    %Run dual regression
+    [ticaP2_DR, ticaA2_DR] = runDR(D, ticaA2, params);
+    
+    %Save scores
+    scores.tICA_DR.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(ticaP2_DR,ticaA2_DR,params), params);
+    [scores.tICA_DR.P(:,2*(n-1)+2), scores.tICA_DR.A(:,2*(n-1)+2), ...
+        scores.tICA_DR.cP(:,2*(n-1)+2), scores.tICA_DR.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, ticaP2_DR, A, ticaA2_DR, params);
+    
+    
+    
+    % Test - retest
+    [scores.tICA.Ptr(:,2*(n-1)+1), scores.tICA.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(ticaP1, ticaP2, params);
+    [scores.tICA_DR.Ptr(:,2*(n-1)+1), scores.tICA_DR.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(ticaP1_DR, ticaP2_DR, params);
+    
+    %% Run sICA & tICA
+    % sICA on high dim PCA, with dual reg, followed by tICA
+    
+    [sticaP1, sticaA1] = runSTICA(D, svdU, svdS, svdV, params, atlasParams.N, params.iN);
+    
+    %Save scores
+    scores.stICA.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(sticaP1,sticaA1,params), params);
+    [scores.stICA.P(:,2*(n-1)+1), scores.stICA.A(:,2*(n-1)+1), ...
+        scores.stICA.cP(:,2*(n-1)+1), scores.stICA.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, sticaP1, A, sticaA1, params);
+    
+    %Run dual regression
+    [sticaP1_DR, sticaA1_DR] = runDR(D, sticaA1, params);
+    
+    %Save scores
+    scores.stICA_DR.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+        makePA(sticaP1_DR,sticaA1_DR,params), params);
+    [scores.stICA_DR.P(:,2*(n-1)+1), scores.stICA_DR.A(:,2*(n-1)+1), ...
+        scores.stICA_DR.cP(:,2*(n-1)+1), scores.stICA_DR.cA(:,2*(n-1)+1)] ...
+        = calculateDecompositionAccuracy(P, sticaP1_DR, A, sticaA1_DR, params);
+    
+    
+    
+    %Repeat
+    [sticaP2, sticaA2] = runSTICA(D, svdU, svdS, svdV, params, atlasParams.N, params.iN);
+    
+    %Save scores
+    scores.stICA.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(sticaP2,sticaA2,params), params);
+    [scores.stICA.P(:,2*(n-1)+2), scores.stICA.A(:,2*(n-1)+2), ...
+        scores.stICA.cP(:,2*(n-1)+2), scores.stICA.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, sticaP2, A, sticaA2, params);
+    
+    %Run dual regression
+    [sticaP2_DR, sticaA2_DR] = runDR(D, sticaA2, params);
+    
+    %Save scores
+    scores.stICA_DR.PA(2*(n-1)+2) = calculateBoldRecovery(PA, ...
+        makePA(sticaP2_DR,sticaA2_DR,params), params);
+    [scores.stICA_DR.P(:,2*(n-1)+2), scores.stICA_DR.A(:,2*(n-1)+2), ...
+        scores.stICA_DR.cP(:,2*(n-1)+2), scores.stICA_DR.cA(:,2*(n-1)+2)] ...
+        = calculateDecompositionAccuracy(P, sticaP2_DR, A, sticaA2_DR, params);
+    
+    
+    
+    % Test - retest
+    [scores.stICA.Ptr(:,2*(n-1)+1), scores.stICA.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(sticaP1, sticaP2, params);
+    [scores.stICA_DR.Ptr(:,2*(n-1)+1), scores.stICA_DR.Ptr(:,2*(n-1)+2)] ...
+        = calculateTestRetestScores(sticaP1_DR, sticaP2_DR, params);
+    
+    %% Save scores to file
+    
+    save(fileName, 'scores', 'params', 'atlasParams', 'modeParams', ...
+        'options', 'atlasOptions', 'modeOptions')
+    
+    %%
+    % P = randn(V,N);
+    % figure; hold all;
+    % for n = 1:50
+    % n
+    % score = paircomponents(P,Pg); plot(abs(score(:,3)), 'Color', [0 0 1] + 0.5*(1-n/50)*[1 1 0]);
+    % pause(1)
+    % A = inv(P'*P)*P'*Dmat;
+    % P = Dmat*A'*inv(A*A');
+    % end
+    
+    
+end
+
+%% Plot results
+
+if plotFigures
+    plotScores(scores, params);
+    input('Press return to continue')
+    close all
+end
+
+%% If run from the command line make sure we quit MATLAB
+
+exit
