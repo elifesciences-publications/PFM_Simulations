@@ -72,12 +72,23 @@ atlasOptions.P.form = 'Additive';
 
 %Choose form for Pg
 atlasOptions.Pg.form = 'BlockAtlas';
+% widthPrecision controls the variability in the size of the parcels
+% Smaller numbers give more variability in parcel sizes
 atlasOptions.Pg.widthPrecision = 25;
 
 %Choose form for Ps
-atlasOptions.Ps.form = 'Null';
+%atlasOptions.Ps.form = 'Null';
+modeOptions.Ps.form = 'Gaussian';
+modeOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
+
+% Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
-atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N); %0.015 * params.V;
+atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N);
+% This parameter controls the size of misalignments
+% It represents the furthest one voxel can be moved by misregistration
+% Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
+% average parcel size. The parameter `c` then represents the max
+% misalignment in terms of number of parcels rather than voxels.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Modes
