@@ -394,8 +394,8 @@ for n = 1:params.N
         endPoint = min(params.V, startPoints(bl)+lengths(bl)-1);
         %Pblocks(startPoints(bl):endPoint, n) = blockSigns(bl) * blockWeights(bl);
         Pblocks(startPoints(bl):endPoint, n) = blockSigns(bl) ...
-            * gamrnd(options.P.weightRange.a, 1/options.P.weightRange.b, ...
-            lengths(bl), 1);
+            * (gamrnd(options.P.weightRange.a, 1/options.P.weightRange.b, ...
+            lengths(bl), 1) + options.P.minWeight);
     end
     
 end

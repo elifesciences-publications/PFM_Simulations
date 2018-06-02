@@ -98,18 +98,30 @@ modeOptions.P.form = 'Additive';
 %Choose form for Pg
 if No_overlap
     modeOptions.Pg.form = 'BlockAtlas';
+    % widthPrecision controls the variability in the size of the parcels
+    % Smaller numbers give more variability in parcel sizes
     modeOptions.Pg.widthPrecision = 10; %25;
 else
     modeOptions.Pg.form = 'BiasedBoxcar';
+    % How many spatially contiguous blocks per mode? Follows Poisson(nBlocks)
     modeOptions.P.nBlocks = 2; %4;
+    % How big are the modes? On average, they cover `p * V` voxels
+    % If we have N modes, then we expect `p * N` modes in every voxel
+    % This is therefore a crude proxy for overlap
     modeOptions.P.p = 1.0 / params.N;
     modeOptions.P.pVar = 0.00075;
-    modeOptions.P.pPosBlock = 1; %0.7;
-    modeOptions.P.smootherWidth = floor( 0.01*modeParams.V );
-    modeOptions.P.minWeight = 0.8; %0.5;
-    modeOptions.P.weightRange.a = 2; %3;
-    modeOptions.P.weightRange.b = 1; %2;
+    % Increase this parameter to make blocks less likely to overlap
     modeOptions.P.biasStrength = 0.75;
+    % Minimum weight - useful to make sure all weights are different from noise
+    modeOptions.P.minWeight = 0.5;
+    % Weights are gamma(a,b) distributed (mean = a/b)
+    % Increasing a,b makes them more stable
+    modeOptions.P.weightRange.a = 5;
+    modeOptions.P.weightRange.b = 5;
+    % Proportion of blocks that are positive
+    modeOptions.P.pPosBlock = 0.8;
+    % Post-hoc smoothing of maps
+    modeOptions.P.smootherWidth = floor( 0.01*modeParams.V );
 end
 
 %Choose form for Ps
@@ -119,8 +131,11 @@ modeOptions.P.PsPg = 0.05; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
 switch modeOptions.Ps.form
     
     case 'SS'
-        modeOptions.Ps.rot = 0.5;     %1;
-        modeOptions.Ps.p = 0.25;      %0.1;
+        % Strength of correlations in the noise
+        modeOptions.Ps.rot = 0.25;
+        % Noise sparsity
+        modeOptions.Ps.p = 0.05;
+        % Standard deviations of spike and slab
         modeOptions.Ps.sigma = 1;
         modeOptions.Ps.epsilon = 0.1;
         
