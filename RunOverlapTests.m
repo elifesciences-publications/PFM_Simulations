@@ -153,6 +153,9 @@ options.An.form = 'Freq';
 options.An.offRate = 0.25 * 1/params.N;
 switch options.An.form
     case 'Freq';
+        % Increasing these parameters will increase the
+        % strength of the correlations at the group,
+        % subject and run level respectively
         options.An.rot = 0.3;
         options.An.rotS = 0.5;
         options.An.rotR = 0.1;
@@ -186,13 +189,22 @@ end
 options.D.SNR = 0.1;
 
 %Type
-options.D.noise.form = 'SpatiotemporallyWhiteTdist';
+options.D.noise.form = 'StructuredTdist';
 switch options.D.noise.form
     case 'SpatiotemporallyWhiteGaussian'
         
     case 'SpatiotemporallyWhiteTdist'
         options.D.noise.a = 8;
         options.D.noise.b = 8;
+        
+    case 'StructuredTdist'
+        options.D.noise.a = 8;
+        options.D.noise.b = 8;
+        % Standard deviations of the respective subspaces
+        options.D.noise.structuredStd = 0.25;
+        options.D.noise.unstructuredStd = 0.75;
+        % Rank of structured noise
+        options.D.noise.N = 20;
 end
 
 

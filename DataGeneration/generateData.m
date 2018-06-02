@@ -14,6 +14,9 @@ switch options.D.noise.form
     case 'SpatiotemporallyWhiteTdist'
         D = generateData_STWhiteTdist(PA, params, options, plotFigures);
         
+    case 'StructuredTdist'
+        D = generateData_StructuredTdist(PA, params, options, plotFigures);
+        
     otherwise
         error('Not a recognised form for D')
         
@@ -103,6 +106,53 @@ end
 if plotFigures
     figure; TwoColourTufteHist(noiseStd * noise / std(noise(:)), 'normalise')
     title(sprintf('Noise distribution (kurtosis: %.2f)', kurtosis(noise(:))))
+end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [ D ] = generateData_StructuredTdist(PA, params, options, plotFigures)
+%Adds:
+%  + a low rank structured subspace
+%  + independent t-distributed noise
+%
+% options.D.noise.a - gamma precision shape parameter
+% options.D.noise.b - gamma precision rate parameter
+% options.D.noise.structuredStd - std of structured subspace
+% options.D.noise.unstructuredStd - std of unstructured subspace
+% options.D.noise.N - rank of structured noise
+
+%Find global variance of BOLD signal
+vPA = 0;
+for s = 1:params.S
+    for r = 1:params.R(s)
+        vPA = vPA + var(PA{s}{r}(:));
+    end
+end
+vPA = vPA / sum(params.R);
+
+%Use SNR to find noise std from signal var
+% SNR = var(signal) / var(noise)
+noiseStd = sqrt( vPA / options.D.SNR );
+
+%Add noise to the signal
+D = cell(params.S, 1);
+for s = 1:params.S
+    D{s} = cell(params.R(s), 1);
+    for r = 1:params.R(s)
+        % Low rank subspace
+        structured = randn(params.V, options.D.noise.N) * randn(options.D.noise.N, params.T)
+        structured = options.D.noise.structuredStd * structured / std(structure(:));
+        
+        % T-distribution, unstructured
+        precisions = gamrnd(options.D.noise.a, 1/options.D.noise.b, params.V, params.T);
+        unstructured = randn(params.V, params.T) ./ sqrt(precisions);
+        unstructured = options.D.noise.unstructuredStd * unstructured / std(unstructured(:));
+        
+        noise = structured + unstructured;
+        D{s}{r} = PA{s}{r} + noiseStd * noise / std(noise(:));
+    end
 end
 
 end
