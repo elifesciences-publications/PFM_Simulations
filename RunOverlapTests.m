@@ -78,8 +78,8 @@ atlasOptions.Pg.widthPrecision = 25;
 
 %Choose form for Ps
 %atlasOptions.Ps.form = 'Null';
-modeOptions.Ps.form = 'Gaussian';
-modeOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
+atlasOptions.Ps.form = 'Gaussian';
+atlasOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
 
 % Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
