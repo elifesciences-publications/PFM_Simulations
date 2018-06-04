@@ -132,9 +132,13 @@ switch modeOptions.Ps.form
     
     case 'SS'
         % Strength of correlations in the noise
-        modeOptions.Ps.rot = 0.25;
+        % This tends to make everything look much more Gaussian so use
+        % with care
+        modeOptions.Ps.rot = 0.0;
         % Noise sparsity
-        modeOptions.Ps.p = 0.05;
+        % `p = c / (V * N)` means that, on average `c` parcels are active
+        % in a given subject that were not in the group maps
+        modeOptions.Ps.p = 10.0 / (modeParams.V * modeParams.N);
         % Standard deviations of spike and slab
         modeOptions.Ps.sigma = 1;
         modeOptions.Ps.epsilon = 0.1;
