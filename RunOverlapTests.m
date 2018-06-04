@@ -5,8 +5,8 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'test';
-No_overlap = true; 
+fileName = 'WeakSpatial_StrongTemporal';
+No_overlap = false; 
 plot_SamFigures = false;
 plot_JanineFigures = true;
 
@@ -49,7 +49,7 @@ params.Tn = ceil(1.25 * params.T * params.TR / params.dt);
 atlasParams = params;
 modeParams = params;
 
-atlasParams.V = 2500;     %Voxels
+atlasParams.V = 10000;     %Voxels
 atlasParams.N = 100;      %Number of nodes in the atlas
 
 modeParams.V = atlasParams.N;
@@ -110,8 +110,8 @@ else
     % This is therefore a crude proxy for overlap
     modeOptions.P.p = 1.0 / params.N;
     modeOptions.P.pVar = 0.00075;
-    % Increase this parameter to make blocks less likely to overlap
-    modeOptions.P.biasStrength = 0.75;
+    % Increase this parameter to make blocks less likely to overlap (0.75)
+    modeOptions.P.biasStrength = 0.9;
     % Minimum weight - useful to make sure all weights are different from noise
     modeOptions.P.minWeight = 0.5;
     % Weights are gamma(a,b) distributed (mean = a/b)
@@ -160,9 +160,9 @@ switch options.An.form
         % Increasing these parameters will increase the
         % strength of the correlations at the group,
         % subject and run level respectively
-        options.An.rot = 0.3;
-        options.An.rotS = 0.5;
-        options.An.rotR = 0.1;
+        options.An.rot = 0.6; % 0.3
+        options.An.rotS = 0.6; % 0.5
+        options.An.rotR = 0.4; % 0.1
         options.An.p = 0.2;
         options.An.fc = 0.1; %in Hz
         options.An.fAmp = 2;
@@ -352,6 +352,11 @@ for n = 1:params.nRepeats
             P, repmat({Pg}, params.S, 1), A, Ag, params);
     end
     
+    %% Save nifti's and run latest versions of melodic and profumo
+    
+    Save_niftis(D,params,fileName,atlasParams);
+    system(sprintf('sh Overlap_functions/ICA_PROFUMO.sh %1.2f %s %d %s',params.TR,fileName,params.iN,pwd))
+
     %% Extract PFMs
     
     %For the first run, may want to plot convergence
@@ -469,13 +474,11 @@ for n = 1:params.nRepeats
         scores.stICA_DR.cP(:,2*(n-1)+1), scores.stICA_DR.cA(:,2*(n-1)+1)] ...
         = calculateDecompositionAccuracy(P, sticaP1_DR, A, sticaA1_DR, params);
     
-    %% Run postprocessing 
-    Save_niftis(D,params,fileName,atlasParams);
-    system(sprintf('sh Overlap_functions/ICA_PROFUMO.sh %1.2f %s %d %s',params.TR,fileName,params.iN,pwd))
-    %unix(sprintf('nice -n 20 ~samh/bin/PROFUMO Results/PFMsims_atlas_%s.json %d Results/PROFUMO_PFMsim_atlas_%s --useHRF %1.2f --hrfFile ~samh/PROFUMO/Scripts/DefaultHRF.phrf -d 0.05 > Results/Output_PROFUMO_PFMsims_atlas_%s.txt',fileName,params.iN,fileName,params.TR,fileName))
-    pause(300)
+    %% Load results from external runs of melodic and profumo
     [sicaPg_new,sica_P1_DR_new,sica_A1_DR_new] = Melodic_DR(fileName,D,atlasParams,params);
     [pfmPg1_new,pfmP1_new,pfmA1_new] = loadNewPROFUMO(fileName,params);
+    
+    %% Plot results
     if plot_JanineFigures
         RunOverlapTests_plots
     end

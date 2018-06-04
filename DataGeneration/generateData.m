@@ -142,8 +142,8 @@ for s = 1:params.S
     D{s} = cell(params.R(s), 1);
     for r = 1:params.R(s)
         % Low rank subspace
-        structured = randn(params.V, options.D.noise.N) * randn(options.D.noise.N, params.T)
-        structured = options.D.noise.structuredStd * structured / std(structure(:));
+        structured = randn(params.V, options.D.noise.N) * randn(options.D.noise.N, params.T);
+        structured = options.D.noise.structuredStd * structured / std(structured(:));
         
         % T-distribution, unstructured
         precisions = gamrnd(options.D.noise.a, 1/options.D.noise.b, params.V, params.T);
