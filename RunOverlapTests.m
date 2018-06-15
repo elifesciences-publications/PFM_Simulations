@@ -35,7 +35,7 @@ params.nRepeats = 1;
 
 %Details of scans
 params.S = 30;       %Subjects
-params.R = 2*ones(params.S,1);   %Repeats
+params.R = 2*ones(params.S,1);   %Runs
 
 params.T = 600;     %No. of time points per fMRI scan
 params.TR = 0.72;
@@ -103,13 +103,13 @@ if No_overlap
     modeOptions.Pg.widthPrecision = 10; %25;
 else
     modeOptions.Pg.form = 'BiasedBoxcar';
-    % How many spatially contiguous blocks per mode? Follows Poisson(nBlocks)
-    modeOptions.P.nBlocks = 2; %4;
+    % How many spatially contiguous blocks per mode? Follows `Poisson(nBlocks) + 1`
+    modeOptions.P.nBlocks = 0.5;
     % How big are the modes? On average, they cover `p * V` voxels
     % If we have N modes, then we expect `p * N` modes in every voxel
     % This is therefore a crude proxy for overlap
-    modeOptions.P.p = 1.0 / params.N;
-    modeOptions.P.pVar = 0.00075;
+    modeOptions.P.p = 1.5 / params.N;
+    modeOptions.P.pVar = 0.015 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
     % Increase this parameter to make blocks less likely to overlap (0.75)
     modeOptions.P.biasStrength = 0.9;
     % Minimum weight - useful to make sure all weights are different from noise
@@ -126,7 +126,7 @@ end
 
 %Choose form for Ps
 modeOptions.Ps.form = 'SS';
-modeOptions.P.PsPg = 0.05; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
+modeOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
 %Set options based on that choice
 switch modeOptions.Ps.form
     
@@ -141,7 +141,7 @@ switch modeOptions.Ps.form
         modeOptions.Ps.p = 10.0 / (modeParams.V * modeParams.N);
         % Standard deviations of spike and slab
         modeOptions.Ps.sigma = 1;
-        modeOptions.Ps.epsilon = 0.1;
+        modeOptions.Ps.epsilon = 0.025;
         
     case 'Gaussian'
         

@@ -248,10 +248,7 @@ for n = 1:params.N
     
     %Generate a random number of blocks
     % - Poisson distributed)
-    nBlocks = poissrnd(options.P.nBlocks);
-    if nBlocks == 0
-        nBlocks = 1;
-    end
+    nBlocks = poissrnd(options.P.nBlocks) + 1;
     
     %Generate a random sparsity parameter from the distribution
     p = betarnd(a,b);
