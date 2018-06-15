@@ -107,7 +107,7 @@ function [ PA ] = generateBoldSignal_FlobsHRF(P, An, params, options, plotFigure
 %voxelwise timecourses
 
 %Load the HRF
-hrf = load([getenv('FSLDIR') '/etc/default_flobs.flobs/hrfbasisfns.txt');
+hrf = load([getenv('FSLDIR') '/etc/default_flobs.flobs/hrfbasisfns.txt']);
 dt = 0.05;   %FLOBS sampling rate
 
 %Interpolate HRF to requested rate
