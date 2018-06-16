@@ -75,6 +75,8 @@ atlasOptions.Pg.form = 'BlockAtlas';
 % widthPrecision controls the variability in the size of the parcels
 % Smaller numbers give more variability in parcel sizes
 atlasOptions.Pg.widthPrecision = 25;
+% Post-hoc smoothing of maps (width, in voxels, of the filter)
+atlasOptions.Pg.smootherWidth = 25.0;
 
 %Choose form for Ps
 %atlasOptions.Ps.form = 'Null';

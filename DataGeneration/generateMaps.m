@@ -192,6 +192,7 @@ function [ Pg ] = generateAdditiveMaps_PgBlockAtlas(params, options, plotFigures
 %  Region sizes are drawn from a Dirichlet distribution
 %
 % options.Pg.widthPrecision - parameter controlling variability in width
+% options.Pg.smootherWidth - width, in voxels, of the smoothing filter
 
 
 %Sample the block lengths
@@ -211,6 +212,12 @@ Pg = zeros(params.V, params.N);
 for n = 1:params.N
     inds = (1 + round(sum( lengths(1:(n-1)) ))):round(sum( lengths(1:n) ));
     Pg(inds, n) = 1;
+end
+
+%Finally, smooth the block maps with a box filter
+h = ones(options.Pg.smootherWidth,1) / options.Pg.smootherWidth;
+for n = 1:params.N
+    Pg(:,n) = conv(Pg(:,n), h, 'same');
 end
 
 end
