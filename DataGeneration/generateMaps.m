@@ -11,6 +11,9 @@ switch options.P.form
     
     case 'Additive'
         P = generateAdditiveMaps(params, options, plotFigures);
+    
+    case 'Probabilistic'
+        P = generateProbabilisticMaps(params, options, plotFigures);
         
     otherwise
         error('Not a recognised form for P')
@@ -62,8 +65,6 @@ switch options.Pg.form
         Pg = generateAdditiveMaps_PgFreq(params, options, plotFigures);
     case 'BlockAtlas'
         Pg = generateAdditiveMaps_PgBlockAtlas(params, options, plotFigures);
-    case 'BiasedBoxcar'
-        Pg = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures);
     otherwise
         error('Not a recognised form for Pg')
 end
@@ -91,6 +92,30 @@ for s = 1:params.S
     else
         P{s} = Pg;
     end
+end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [ P ] = generateProbabilisticMaps(params, options, plotFigures)
+%Generate a set of maps where the subject differences are simply added to
+%the global maps
+
+%Generate global maps
+switch options.Pg.form
+    case 'BiasedBoxcar'
+        Pg = generateProbabilisticMaps_PgBiasedBoxcar(params, options, plotFigures);
+    otherwise
+        error('Not a recognised form for Pg')
+end
+
+%Generate subject maps
+switch options.Ps.form
+    case 'DoubleGamma'
+        P = generateProbabilisticMaps_PsDoubleGamma(params, options, Pg, plotFigures);
+    otherwise
+        error('Not a recognised form for Ps')
 end
 
 end
@@ -192,7 +217,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [ Pg ] = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures)
+function [ Pg ] = generateProbabilisticMaps_PgBiasedBoxcar(params, options, plotFigures)
 %Generates a set of spatial maps where activations are grouped in blocks
 %  A random number of blocks and a random sparsity map sparsity are
 %  simulated. Then, the blocks lengths, signs and positions are generated.
@@ -201,19 +226,15 @@ function [ Pg ] = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures
 %  network. The weights are drawn from a gamma distribution. Finally, the 
 %  maps are smoothed slightly.
 %
-% options.P.nBlocks - expected number of separate blocks per map
-% options.P.p - expected sparsity of the maps
-% options.P.pVar - variance of this sparsity over networks
-% options.P.pPosBlock - proportion of blocks that are positive
-% options.P.smootherWidth - width, in voxels, of the smoothing filter
-% options.P.minWeight - allows a minimum map weight to be specified
-% options.P.weightRange.a - gamma weight shape parameter
-% options.P.weightRange.b - gamma weight rate parameter
-% options.P.biasStrength - how strong the exclusion bias is, in [0 1]
+% options.Pg.nBlocks - expected number of separate blocks per map
+% options.Pg.p - expected sparsity of the maps
+% options.Pg.pVar - variance of this sparsity over networks
+% options.Pg.pPosBlock - proportion of blocks that are positive
+% options.Pg.biasStrength - how strong the exclusion bias is, in [0 1]
 
 %Random sparsity (overall number of voxels in the blocks) is Beta distributed
 %First recover the a and b parameters from the mean and variance
-m = options.P.p; v = options.P.pVar;
+m = options.Pg.p; v = options.Pg.pVar;
 p_a = (m^2 * (1-m) / v) - m;
 p_b = (m * (1-m)^2 / v) - (1-m);
 
@@ -224,18 +245,6 @@ if plotFigures
     figure; plot(x, p);
     xlim([0 1]); xlabel('x'); ylabel('p(x)')
     title('BiasedBoxcar: distribution of map sparsity')
-    
-    %Plot the weight distribution
-    gamMode = max(1, (options.P.weightRange.a-1)/options.P.weightRange.b);
-    x = linspace(0, 5*gamMode, 500);
-    p = gampdf(x, options.P.weightRange.a, 1/options.P.weightRange.b);
-    
-    figure; plot(x+options.P.minWeight, options.P.p * options.P.pPosBlock * p);
-    hold on; plot(-x-options.P.minWeight, options.P.p * (1-options.P.pPosBlock) * p);
-    plot([0 0], [0 (1-options.P.p)], 'r');
-    xlim([-x(end) x(end)]); xlabel('x'); ylabel('p(x)')
-    title('BiasedBoxcar: distribution of map weights')
-    
 end
 
 %Generate empty maps
@@ -247,7 +256,7 @@ for n = 1:params.N
     
     %Generate a random number of blocks
     % - Poisson distributed)
-    nBlocks = poissrnd(options.P.nBlocks) + 1;
+    nBlocks = poissrnd(options.Pg.nBlocks) + 1;
     
     %Generate a random sparsity parameter from the distribution
     p = betarnd(p_a, p_b);
@@ -265,20 +274,15 @@ for n = 1:params.N
     lengths = round(lengths); lengths(lengths==0) = 1;
     
     %Sample the block signs
-    signs = sign(options.P.pPosBlock - rand(nBlocks, 1));
+    signs = sign(options.Pg.pPosBlock - rand(nBlocks, 1));
     signs(1) = 1; % Make largest blocks +ve
     
     for b = 1:nBlocks
-        %Sample the block weights
-        shape = options.P.weightRange.a;
-        scale = 1.0 / options.P.weightRange.b;
-        weights = signs(b) * ...
-            (gamrnd(shape, scale, lengths(b), 1) + options.P.minWeight);
         
         %And put together
         block.mode = n;
-        block.weights = weights;
         block.length = lengths(b);
+        block.weights = signs(b) * ones(block.length, 1);
         
         blocks{end+1} = block;
     end
@@ -292,17 +296,20 @@ for b = 1:length(blocks)
 end
 [~,inds] = sort(lengths,1,'descend');
 
+% And reorder
+blocks = blocks(inds);
+
 % Now put into the maps
 usedBlocks = 0;
 while usedBlocks < length(blocks)
     
     % Take the blocks, from longest first, until they cover enough voxels
     currentInds = []; currentVoxels = 0;
-    targetVoxels = params.V * options.P.biasStrength;
+    targetVoxels = params.V * options.Pg.biasStrength;
     for b = (usedBlocks+1):length(blocks)
-        currentBlock = blocks{inds(b)};
+        currentBlock = blocks{b};
         if (currentVoxels + currentBlock.length) <= targetVoxels
-            currentInds(end+1) = inds(b);
+            currentInds(end+1) = b;
             currentVoxels = currentVoxels + currentBlock.length;
         else
             break
@@ -326,12 +333,6 @@ while usedBlocks < length(blocks)
     end
     
     usedBlocks = usedBlocks + length(currentInds);
-end
-
-%Finally, smooth the block maps with a box filter
-h = ones(options.P.smootherWidth,1) / options.P.smootherWidth;
-for n = 1:params.N
-    Pblocks(:,n) = conv(Pblocks(:,n), h, 'same');
 end
 
 Pg = Pblocks;
@@ -383,6 +384,55 @@ function [ Ps ] = generateAdditiveMaps_PsNull(params, options, Pg, plotFigures)
 Ps = cell(params.S, 1);
 for s = 1:params.S
     Ps{s} = zeros(params.V, params.N);
+end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [ Ps ] = generateProbabilisticMaps_PsDoubleGamma(params, options, Pg, plotFigures)
+%Generates subject maps following a double-Gamma distribution
+%
+% options.Ps.p - probability subject voxel is not drawn from group distribution
+% options.Ps.minWeight - allows a minimum map weight to be specified
+% options.Ps.weightRange.a - gamma weight shape parameter
+% options.Ps.weightRange.b - gamma weight rate parameter
+% options.Ps.weightRange.b - gamma weight rate parameter
+% options.Ps.epsilon - Gaussian noise for zero weights
+
+if plotFigures
+    %Plot the weight distribution
+    gamMode = max(1, (options.Ps.weightRange.a-1)/options.Ps.weightRange.b);
+    x = linspace(0, 5*gamMode, 500);
+    p = gampdf(x, options.Ps.weightRange.a, 1/options.Ps.weightRange.b);
+    
+    figure; plot(x+options.Ps.minWeight, p);
+    hold on; plot(-x-options.Ps.minWeight, p);
+    xlim([-x(end) x(end)]); xlabel('x'); ylabel('p(x)')
+    title('DoubleGamma: distribution of map weights')
+    
+end
+
+%Block weight params
+shape = options.Ps.weightRange.a;
+scale = 1.0 / options.Ps.weightRange.b;
+
+% Sample the subject maps
+Ps = cell(params.S, 1);
+for s = 1:params.S
+    Ps{s} = options.Ps.epsilon * randn(params.V, params.N);
+    for v = 1:params.V
+        for n = 1:params.N
+            
+            change = (rand() < options.Ps.p);
+            if (Pg(v,n) ~= 0 && ~change) || (Pg(v,n) == 0 && change)
+                % Pg(v,n) gives sign too
+                sign = Pg(v,n) + change;
+                Ps{s}(v,n) = sign * (gamrnd(shape, scale) + options.Ps.minWeight);
+            end
+            
+        end
+    end
 end
 
 end

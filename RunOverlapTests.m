@@ -93,63 +93,38 @@ atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Modes
 
-modeOptions.P.form = 'Additive';
+modeOptions.P.form = 'Probabilistic';
 
-%Choose form for Pg
-if No_overlap
-    modeOptions.Pg.form = 'BlockAtlas';
-    % widthPrecision controls the variability in the size of the parcels
-    % Smaller numbers give more variability in parcel sizes
-    modeOptions.Pg.widthPrecision = 10; %25;
-else
-    modeOptions.Pg.form = 'BiasedBoxcar';
-    % How many spatially contiguous blocks per mode? Follows `Poisson(nBlocks) + 1`
-    modeOptions.P.nBlocks = 1.25;
-    % How big are the modes? On average, they cover `p * V` voxels
-    % If we have N modes, then we expect `p * N` modes in every voxel
-    % This is therefore a crude proxy for overlap
-    %%% HighOverlap: 1.4; LowOverlap 1.2; %%%
-    modeOptions.P.p = 1.2 / params.N;
-    modeOptions.P.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
-    % Increase this parameter to make blocks less likely to overlap
-    % Between 0 and 1
-    %%% HighOverlap: 0.5; LowOverlap 0.9; %%%
-    modeOptions.P.biasStrength = 0.9;
-    % Minimum weight - useful to make sure all weights are different from noise
-    modeOptions.P.minWeight = 0.0;
-    % Weights are gamma(a,b) distributed (mean = a/b)
-    % Increasing a,b makes them more stable
-    modeOptions.P.weightRange.a = 5.0;
-    modeOptions.P.weightRange.b = 5.0;
-    % Proportion of (secondary) blocks that are positive
-    modeOptions.P.pPosBlock = 0.7;
-    % Post-hoc smoothing of maps
-    modeOptions.P.smootherWidth = floor( 0.01*modeParams.V );
-end
+modeOptions.Pg.form = 'BiasedBoxcar';
+% How many spatially contiguous blocks per mode? Follows `Poisson(nBlocks) + 1`
+modeOptions.Pg.nBlocks = 1.25;
+% How big are the modes? On average, they cover `p * V` voxels
+% If we have N modes, then we expect `p * N` modes in every voxel
+% This is therefore a crude proxy for overlap
+%%% HighOverlap: 1.4; LowOverlap 1.2; %%%
+modeOptions.Pg.p = 1.2 / params.N;
+modeOptions.Pg.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
+% Increase this parameter to make blocks less likely to overlap
+% Between 0 and 1
+%%% HighOverlap: 0.5; LowOverlap 0.9; %%%
+modeOptions.Pg.biasStrength = 0.9;
+% Proportion of (secondary) blocks that are positive
+modeOptions.Pg.pPosBlock = 0.7;
 
 %Choose form for Ps
-modeOptions.Ps.form = 'SS';
-modeOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
-%Set options based on that choice
-switch modeOptions.Ps.form
-    
-    case 'SS'
-        % Strength of correlations in the noise
-        % This tends to make everything look much more Gaussian so use
-        % with care
-        modeOptions.Ps.rot = 0.0;
-        % Noise sparsity
-        % `p = c / (V * N)` means that, on average `c` parcels are active
-        % in a given subject that were not in the group maps
-        modeOptions.Ps.p = 10.0 / (modeParams.V * modeParams.N);
-        % Standard deviations of spike and slab
-        modeOptions.Ps.sigma = 1;
-        modeOptions.Ps.epsilon = 0.025;
-        
-    case 'Gaussian'
-        
-    case 'Null'
-end
+modeOptions.Ps.form = 'DoubleGamma';
+% Probability subject voxel is not drawn from group distribution
+% `p = c / (V * N)` means that, on average `c` parcels are active
+% in a given subject that were not in the group maps
+modeOptions.Ps.p = 5.0 / (modeParams.V * modeParams.N);
+% Minimum weight - useful to make sure all weights are different from noise
+modeOptions.Ps.minWeight = 0.0;
+% Weights are gamma(a,b) distributed (mean = a/b)
+% Increasing a,b makes them more stable
+modeOptions.Ps.weightRange.a = 2.0;
+modeOptions.Ps.weightRange.b = 2.0;
+% Little bit of Gaussian noise for old times sake
+modeOptions.Ps.epsilon = 0.01;
 
 %Choose registration errors
 modeOptions.P.registration.form = 'Null';
