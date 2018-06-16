@@ -134,7 +134,7 @@ modeOptions.P.registration.form = 'Null';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Time courses
 options.An.form = 'Freq';
-options.An.offRate = 0.25 * 1/params.N;
+options.An.offRate = 0.05 * 1/params.N;
 switch options.An.form
     case 'Freq';
         % Increasing these parameters will increase the
@@ -241,21 +241,21 @@ for n = 1:params.nRepeats
         end
     end
     
-    if plot_SamFigures
-        cP = P{1}' * P{1};
-        cP = cP ./ sqrt(diag(cP)*diag(cP)');
-        figure; imagesc(cP, [-1 1]); colorbar; colormap(bluewhitered)
-        xlabel('Mode'); ylabel('Mode');
-        axis square
-        set(gcf, 'Position', [200 200 500 400])
-        
-        cA = [An{1}{1} An{1}{2} An{1}{3} An{1}{4}] * [An{1}{1} An{1}{2} An{1}{3} An{1}{4}]';
-        cA = cA ./ sqrt(diag(cA)*diag(cA)');
-        figure; imagesc(cA, [-1 1]); colorbar; colormap(bluewhitered)
-        xlabel('Mode'); ylabel('Mode');
-        axis square
-        set(gcf, 'Position', [200 200 500 400])
-    end
+%     if plot_SamFigures
+%         cP = P{1}' * P{1};
+%         cP = cP ./ sqrt(diag(cP)*diag(cP)');
+%         figure; imagesc(cP, [-1 1]); colorbar; colormap(bluewhitered)
+%         xlabel('Mode'); ylabel('Mode');
+%         axis square
+%         set(gcf, 'Position', [200 200 500 400])
+%         
+%         cA = [An{1}{1} An{1}{2} An{1}{3} An{1}{4}] * [An{1}{1} An{1}{2} An{1}{3} An{1}{4}]';
+%         cA = cA ./ sqrt(diag(cA)*diag(cA)');
+%         figure; imagesc(cA, [-1 1]); colorbar; colormap(bluewhitered)
+%         xlabel('Mode'); ylabel('Mode');
+%         axis square
+%         set(gcf, 'Position', [200 200 500 400])
+%     end
     
     %% Look at ground truth accuracy in the PA subspace
     % This looks at how well the linear mixing model can do, in the best
