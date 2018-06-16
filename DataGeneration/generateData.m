@@ -142,7 +142,10 @@ for s = 1:params.S
     D{s} = cell(params.R(s), 1);
     for r = 1:params.R(s)
         % Low rank subspace
-        structured = randn(params.V, options.D.noise.N) * randn(options.D.noise.N, params.T);
+        % Gaussian maps and TCs, gamma amplitudes
+        structured = randn(params.V, options.D.noise.N) ...
+            * diag(gamrnd(2.0, 2.0, options.D.noise.N, 1))...
+            * randn(options.D.noise.N, params.T);
         structured = options.D.noise.structuredStd * structured / std(structured(:));
         
         % T-distribution, unstructured
@@ -153,6 +156,16 @@ for s = 1:params.S
         noise = structured + unstructured;
         D{s}{r} = PA{s}{r} + noiseStd * noise / std(noise(:));
     end
+end
+
+%Plot noise distribution
+if plotFigures
+    figure; TwoColourTufteHist(noise / std(noise(:)), 'normalise')
+    title(sprintf('Noise distribution (kurtosis: %.2f)', kurtosis(noise(:))))
+    
+    s = randi(params.S,1); r = randi(params.R(s),1);
+    figure; imagesc(noise / std(noise(:)), 3*[-1 1]); colorbar
+    title(['Example noise: subject ' num2str(s) ', repeat ' num2str(r)])
 end
 
 end

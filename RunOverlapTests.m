@@ -182,11 +182,11 @@ switch options.D.noise.form
         options.D.noise.b = 8;
         
     case 'StructuredTdist'
-        options.D.noise.a = 8;
-        options.D.noise.b = 8;
+        options.D.noise.a = 3.0;
+        options.D.noise.b = 3.0;
         % Standard deviations of the respective subspaces
-        options.D.noise.structuredStd = 0.25;
-        options.D.noise.unstructuredStd = 0.75;
+        options.D.noise.structuredStd = 1.0;
+        options.D.noise.unstructuredStd = 1.0;
         % Rank of structured noise
         options.D.noise.N = 20;
 end
