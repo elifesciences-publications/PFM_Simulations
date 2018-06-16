@@ -62,8 +62,6 @@ switch options.Pg.form
         Pg = generateAdditiveMaps_PgFreq(params, options, plotFigures);
     case 'BlockAtlas'
         Pg = generateAdditiveMaps_PgBlockAtlas(params, options, plotFigures);
-    case 'RandBoxcar'
-        Pg = generateAdditiveMaps_RandBoxcar(params, options, plotFigures);
     case 'BiasedBoxcar'
         Pg = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures);
     otherwise
@@ -216,13 +214,13 @@ function [ Pg ] = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures
 %Random sparsity (overall number of voxels in the blocks) is Beta distributed
 %First recover the a and b parameters from the mean and variance
 m = options.P.p; v = options.P.pVar;
-a = (m^2 * (1-m) / v) - m;
-b = (m * (1-m)^2 / v) - (1-m);
+p_a = (m^2 * (1-m) / v) - m;
+p_b = (m * (1-m)^2 / v) - (1-m);
 
 if plotFigures
     %Plot the sparsity distribution
     x = linspace(0, 1, 250);
-    p = betapdf(x, a, b);
+    p = betapdf(x, p_a, p_b);
     figure; plot(x, p);
     xlim([0 1]); xlabel('x'); ylabel('p(x)')
     title('BiasedBoxcar: distribution of map sparsity')
@@ -241,9 +239,10 @@ if plotFigures
 end
 
 %Generate empty maps
+blocks = {};
 Pblocks = zeros(params.V, params.N);
 
-%Generate the parameters of the global distribution
+%Generate the parameters of the blocks
 for n = 1:params.N
     
     %Generate a random number of blocks
@@ -251,62 +250,82 @@ for n = 1:params.N
     nBlocks = poissrnd(options.P.nBlocks) + 1;
     
     %Generate a random sparsity parameter from the distribution
-    p = betarnd(a,b);
+    p = betarnd(p_a, p_b);
     
     %Sample the block lengths
     % - Dirichlet distribution
     %This is a normalised vector of unit-scale gamma random variables
-    %First make the dirichlet prior - by making the first element half the
+    %First make the dirichlet prior - by making the first element most of the
     %total this controls the minimum block size
-    lengths = ones(nBlocks,1); lengths(1) = max(1, 1.0*(nBlocks-1));
-    lengths = lengths(randperm(nBlocks));
+    lengths = ones(nBlocks,1); lengths(1) = 2.0;
     lengths = gamrnd(10*lengths, 1, nBlocks, 1); %First param controls variability
     lengths = lengths / sum(lengths);
     %Convert to voxels, taking into account sparsity
     lengths = p * params.V * lengths;
     lengths = round(lengths); lengths(lengths==0) = 1;
     
-    %Sample the block start points
-    if n == 1
-        %Sample first set randomly
-        startPoints = randi(params.V - max(lengths) + 1, nBlocks);
-    else
-        %For subsequent blocks, bias against spatial overlap
-        %Find out how overlapping previous blocks are
-        spatialOverlap = sum(abs(Pblocks(:, 1:(n-1))), 2);
-        spatialOverlap = options.P.biasStrength * (spatialOverlap) ...
-            + (1 - options.P.biasStrength) * mean(spatialOverlap);
+    %Sample the block signs
+    signs = sign(options.P.pPosBlock - rand(nBlocks, 1));
+    signs(1) = 1; % Make largest blocks +ve
+    
+    for b = 1:nBlocks
+        %Sample the block weights
+        shape = options.P.weightRange.a;
+        scale = 1.0 / options.P.weightRange.b;
+        weights = signs(b) * ...
+            (gamrnd(shape, scale, lengths(b), 1) + options.P.minWeight);
         
-        startPoints = zeros(nBlocks,1);
-        for b1 = 1:nBlocks
-            %Generate a weighting that biases against starting somewhere
-            %where overlap is high
-            weights = conv(1./spatialOverlap, ones(lengths(b1),1), 'valid');
-            if sum(isinf(weights) ~= 0)
-                weights(~isinf(weights)) = 0; weights(isinf(weights)) = 1;
-            end
-            inds = 1:(params.V-lengths(b1)+1);
-            %Randomly sample a start point
-            startPoints(b1) = randsample(inds, 1, true, weights(inds));
+        %And put together
+        block.mode = n;
+        block.weights = weights;
+        block.length = lengths(b);
+        
+        blocks{end+1} = block;
+    end
+    
+end
+
+% Find the longest blocks
+lengths = zeros(length(blocks),1);
+for b = 1:length(blocks)
+    lengths(b) = blocks{b}.length;
+end
+[~,inds] = sort(lengths,1,'descend');
+
+% Now put into the maps
+usedBlocks = 0;
+while usedBlocks < length(blocks)
+    
+    % Take the blocks, from longest first, until they cover enough voxels
+    currentInds = []; currentVoxels = 0;
+    targetVoxels = params.V * options.P.biasStrength;
+    for b = (usedBlocks+1):length(blocks)
+        currentBlock = blocks{inds(b)};
+        if (currentVoxels + currentBlock.length) <= targetVoxels
+            currentInds(end+1) = inds(b);
+            currentVoxels = currentVoxels + currentBlock.length;
+        else
+            break
         end
     end
+    currentInds = currentInds(randperm(length(currentInds)));
     
-    %Sample the block signs
-    blockSigns = sign(options.P.pPosBlock - rand(nBlocks, 1));
+    % Simulate the gaps between blocks
+    % Dirichlet
+    gaps = gamrnd(1, 1, length(currentInds)+1, 1);
+    gaps = gaps / sum(gaps);
+    gaps = gaps * (params.V - currentVoxels);
+    gaps = floor(gaps);
     
-    %Sample the block weights
-    %blockWeights = options.P.minWeight ...
-    %    + gamrnd(options.P.weightRange.a, 1/options.P.weightRange.b, nBlocks, 1);
-    
-    %Add the blocks in
-    for bl = 1:nBlocks
-        endPoint = min(params.V, startPoints(bl)+lengths(bl)-1);
-        %Pblocks(startPoints(bl):endPoint, n) = blockSigns(bl) * blockWeights(bl);
-        Pblocks(startPoints(bl):endPoint, n) = blockSigns(bl) ...
-            * (gamrnd(options.P.weightRange.a, 1/options.P.weightRange.b, ...
-            lengths(bl), 1) + options.P.minWeight);
+    % And put together
+    start = 1 + gaps(1);
+    for b = 1:length(currentInds)
+        block = blocks{currentInds(b)};
+        Pblocks(start:start+block.length-1, block.mode) = block.weights;
+        start = start + block.length + gaps(b+1);
     end
     
+    usedBlocks = usedBlocks + length(currentInds);
 end
 
 %Finally, smooth the block maps with a box filter

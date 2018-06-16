@@ -104,22 +104,25 @@ if No_overlap
 else
     modeOptions.Pg.form = 'BiasedBoxcar';
     % How many spatially contiguous blocks per mode? Follows `Poisson(nBlocks) + 1`
-    modeOptions.P.nBlocks = 0.5;
+    modeOptions.P.nBlocks = 1.25;
     % How big are the modes? On average, they cover `p * V` voxels
     % If we have N modes, then we expect `p * N` modes in every voxel
     % This is therefore a crude proxy for overlap
-    modeOptions.P.p = 1.5 / params.N;
-    modeOptions.P.pVar = 0.015 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
-    % Increase this parameter to make blocks less likely to overlap (0.75)
+    %%% HighOverlap: 1.4; LowOverlap 1.2; %%%
+    modeOptions.P.p = 1.2 / params.N;
+    modeOptions.P.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
+    % Increase this parameter to make blocks less likely to overlap
+    % Between 0 and 1
+    %%% HighOverlap: 0.5; LowOverlap 0.9; %%%
     modeOptions.P.biasStrength = 0.9;
     % Minimum weight - useful to make sure all weights are different from noise
-    modeOptions.P.minWeight = 0.5;
+    modeOptions.P.minWeight = 0.0;
     % Weights are gamma(a,b) distributed (mean = a/b)
     % Increasing a,b makes them more stable
-    modeOptions.P.weightRange.a = 5;
-    modeOptions.P.weightRange.b = 5;
-    % Proportion of blocks that are positive
-    modeOptions.P.pPosBlock = 0.8;
+    modeOptions.P.weightRange.a = 5.0;
+    modeOptions.P.weightRange.b = 5.0;
+    % Proportion of (secondary) blocks that are positive
+    modeOptions.P.pPosBlock = 0.7;
     % Post-hoc smoothing of maps
     modeOptions.P.smootherWidth = floor( 0.01*modeParams.V );
 end
