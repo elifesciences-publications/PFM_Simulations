@@ -11,6 +11,9 @@ switch options.P.form
     
     case 'Additive'
         P = generateAdditiveMaps(params, options, plotFigures);
+    
+    case 'Probabilistic'
+        P = generateProbabilisticMaps(params, options, plotFigures);
         
     otherwise
         error('Not a recognised form for P')
@@ -62,10 +65,6 @@ switch options.Pg.form
         Pg = generateAdditiveMaps_PgFreq(params, options, plotFigures);
     case 'BlockAtlas'
         Pg = generateAdditiveMaps_PgBlockAtlas(params, options, plotFigures);
-    case 'RandBoxcar'
-        Pg = generateAdditiveMaps_RandBoxcar(params, options, plotFigures);
-    case 'BiasedBoxcar'
-        Pg = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures);
     otherwise
         error('Not a recognised form for Pg')
 end
@@ -93,6 +92,30 @@ for s = 1:params.S
     else
         P{s} = Pg;
     end
+end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [ P ] = generateProbabilisticMaps(params, options, plotFigures)
+%Generate a set of maps where the subject differences are simply added to
+%the global maps
+
+%Generate global maps
+switch options.Pg.form
+    case 'BiasedBoxcar'
+        Pg = generateProbabilisticMaps_PgBiasedBoxcar(params, options, plotFigures);
+    otherwise
+        error('Not a recognised form for Pg')
+end
+
+%Generate subject maps
+switch options.Ps.form
+    case 'DoubleGamma'
+        P = generateProbabilisticMaps_PsDoubleGamma(params, options, Pg, plotFigures);
+    otherwise
+        error('Not a recognised form for Ps')
 end
 
 end
@@ -169,6 +192,7 @@ function [ Pg ] = generateAdditiveMaps_PgBlockAtlas(params, options, plotFigures
 %  Region sizes are drawn from a Dirichlet distribution
 %
 % options.Pg.widthPrecision - parameter controlling variability in width
+% options.Pg.smootherWidth - width, in voxels, of the smoothing filter
 
 
 %Sample the block lengths
@@ -190,99 +214,17 @@ for n = 1:params.N
     Pg(inds, n) = 1;
 end
 
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [ Pg ] = generateAdditiveMaps_RandBoxcar(params, options, plotFigures)
-%Generates a set of spatial maps where activations are grouped in blocks
-%  A random number of blocks and a random sparsity map sparsity are
-%  simulated. Then, the blocks lengths, signs and positions are generated.
-%  This is repeated to give a set of block based activations for each
-%  network. These are smoothed slightly before Gaussian noise is added to
-%  simulate variability over subjects.
-%
-% options.P.nBlocks - expected number of separate blocks per map
-% options.P.p - expected sparsity of the maps
-% options.P.pVar - variance of this sparsity over networks
-% options.P.pPosBlock - proportion of blocks that are positive
-% options.P.smootherWidth - width, in voxels, of the smoothing filter
-% options.P.weightRange - range of block weights, centred around 1
-
-%Random sparsity (overall number of voxels in the blocks) is Beta distributed
-%First recover the a and b parameters from the mean and variance
-m = options.P.p; v = options.P.pVar;
-a = (m^2 * (1-m) / v) - m;
-b = (m * (1-m)^2 / v) - (1-m);
-
-if plotFigures
-    %Plot the distribution
-    x = linspace(0, 1, 250);
-    p = betapdf(x, a, b);
-    figure; plot(x, p);
-    xlim([0 1]); xlabel('x'); ylabel('p(x)')
-    title('RandBoxcar: distribution of map sparsity')
-end
-
-%Generate empty maps
-Pblocks = zeros(params.V, params.N);
-
-%Generate the parameters of the global distribution
-for n = 1:params.N
-    
-    %Generate a random number of blocks
-    % - Poisson distributed)
-    nBlocks = poissrnd(options.P.nBlocks);
-    if nBlocks == 0
-        nBlocks = 1;
-    end
-    
-    %Generate a random sparsity parameter from the distribution
-    p = betarnd(a,b);
-    
-    %Sample the block lengths
-    % - Dirichlet distribution
-    %This is a normalised vector of unit-scale gamma random variables
-    %First make the dirichlet prior - by making the first element half the
-    %total this controls the minimum block size
-    lengths = ones(nBlocks,1); lengths(1) = max(1, 1.0*(nBlocks-1));
-    lengths = lengths(randperm(nBlocks));
-    lengths = gamrnd(10*lengths, 1, nBlocks, 1); %First param controls variability
-    lengths = lengths / sum(lengths);
-    %Convert to voxels, taking into account sparsity
-    lengths = p * params.V * lengths;
-    lengths = floor(lengths);
-    
-    %Sample the block start points
-    startPoints = randi(params.V - max(lengths), nBlocks);
-    
-    %Sample the block signs
-    blockSigns = sign(options.P.pPosBlock - rand(nBlocks, 1));
-    
-    %Sample the block weights
-    blockWeights = 1 + options.P.weightRange * (rand(nBlocks, 1) - 0.5);
-    
-    %Add the blocks in
-    for bl = 1:nBlocks
-        endPoint = min(params.V, startPoints(bl)+lengths(bl)-1);
-        Pblocks(startPoints(bl):endPoint, n) = blockSigns(bl) * blockWeights(bl);
-    end
-    
-end
-
 %Finally, smooth the block maps with a box filter
-h = ones(options.P.smootherWidth,1) / options.P.smootherWidth;
+h = ones(options.Pg.smootherWidth,1) / options.Pg.smootherWidth;
 for n = 1:params.N
-    Pblocks(:,n) = conv(Pblocks(:,n), h, 'same');
+    Pg(:,n) = conv(Pg(:,n), h, 'same');
 end
-
-Pg = Pblocks;
 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [ Pg ] = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures)
+function [ Pg ] = generateProbabilisticMaps_PgBiasedBoxcar(params, options, plotFigures)
 %Generates a set of spatial maps where activations are grouped in blocks
 %  A random number of blocks and a random sparsity map sparsity are
 %  simulated. Then, the blocks lengths, signs and positions are generated.
@@ -291,119 +233,113 @@ function [ Pg ] = generateAdditiveMaps_BiasedBoxcar(params, options, plotFigures
 %  network. The weights are drawn from a gamma distribution. Finally, the 
 %  maps are smoothed slightly.
 %
-% options.P.nBlocks - expected number of separate blocks per map
-% options.P.p - expected sparsity of the maps
-% options.P.pVar - variance of this sparsity over networks
-% options.P.pPosBlock - proportion of blocks that are positive
-% options.P.smootherWidth - width, in voxels, of the smoothing filter
-% options.P.minWeight - allows a minimum map weight to be specified
-% options.P.weightRange.a - gamma weight shape parameter
-% options.P.weightRange.b - gamma weight rate parameter
-% options.P.biasStrength - how strong the exclusion bias is, in [0 1]
+% options.Pg.nBlocks - expected number of separate blocks per map
+% options.Pg.p - expected sparsity of the maps
+% options.Pg.pVar - variance of this sparsity over networks
+% options.Pg.pPosBlock - proportion of blocks that are positive
+% options.Pg.biasStrength - how strong the exclusion bias is, in [0 1]
 
 %Random sparsity (overall number of voxels in the blocks) is Beta distributed
 %First recover the a and b parameters from the mean and variance
-m = options.P.p; v = options.P.pVar;
-a = (m^2 * (1-m) / v) - m;
-b = (m * (1-m)^2 / v) - (1-m);
+m = options.Pg.p; v = options.Pg.pVar;
+p_a = (m^2 * (1-m) / v) - m;
+p_b = (m * (1-m)^2 / v) - (1-m);
 
 if plotFigures
     %Plot the sparsity distribution
     x = linspace(0, 1, 250);
-    p = betapdf(x, a, b);
+    p = betapdf(x, p_a, p_b);
     figure; plot(x, p);
     xlim([0 1]); xlabel('x'); ylabel('p(x)')
     title('BiasedBoxcar: distribution of map sparsity')
-    
-    %Plot the weight distribution
-    gamMode = max(1, (options.P.weightRange.a-1)/options.P.weightRange.b);
-    x = linspace(0, 5*gamMode, 500);
-    p = gampdf(x, options.P.weightRange.a, 1/options.P.weightRange.b);
-    
-    figure; plot(x+options.P.minWeight, options.P.p * options.P.pPosBlock * p);
-    hold on; plot(-x-options.P.minWeight, options.P.p * (1-options.P.pPosBlock) * p);
-    plot([0 0], [0 (1-options.P.p)], 'r');
-    xlim([-x(end) x(end)]); xlabel('x'); ylabel('p(x)')
-    title('BiasedBoxcar: distribution of map weights')
-    
 end
 
 %Generate empty maps
+blocks = {};
 Pblocks = zeros(params.V, params.N);
 
-%Generate the parameters of the global distribution
+%Generate the parameters of the blocks
 for n = 1:params.N
     
     %Generate a random number of blocks
     % - Poisson distributed)
-    nBlocks = poissrnd(options.P.nBlocks);
-    if nBlocks == 0
-        nBlocks = 1;
-    end
+    nBlocks = poissrnd(options.Pg.nBlocks) + 1;
     
     %Generate a random sparsity parameter from the distribution
-    p = betarnd(a,b);
+    p = betarnd(p_a, p_b);
     
     %Sample the block lengths
     % - Dirichlet distribution
     %This is a normalised vector of unit-scale gamma random variables
-    %First make the dirichlet prior - by making the first element half the
+    %First make the dirichlet prior - by making the first element most of the
     %total this controls the minimum block size
-    lengths = ones(nBlocks,1); lengths(1) = max(1, 1.0*(nBlocks-1));
-    lengths = lengths(randperm(nBlocks));
+    lengths = ones(nBlocks,1); lengths(1) = 2.0;
     lengths = gamrnd(10*lengths, 1, nBlocks, 1); %First param controls variability
     lengths = lengths / sum(lengths);
     %Convert to voxels, taking into account sparsity
     lengths = p * params.V * lengths;
     lengths = round(lengths); lengths(lengths==0) = 1;
     
-    %Sample the block start points
-    if n == 1
-        %Sample first set randomly
-        startPoints = randi(params.V - max(lengths) + 1, nBlocks);
-    else
-        %For subsequent blocks, bias against spatial overlap
-        %Find out how overlapping previous blocks are
-        spatialOverlap = sum(abs(Pblocks(:, 1:(n-1))), 2);
-        spatialOverlap = options.P.biasStrength * (spatialOverlap) ...
-            + (1 - options.P.biasStrength) * mean(spatialOverlap);
-        
-        startPoints = zeros(nBlocks,1);
-        for b1 = 1:nBlocks
-            %Generate a weighting that biases against starting somewhere
-            %where overlap is high
-            weights = conv(1./spatialOverlap, ones(lengths(b1),1), 'valid');
-            if sum(isinf(weights) ~= 0)
-                weights(~isinf(weights)) = 0; weights(isinf(weights)) = 1;
-            end
-            inds = 1:(params.V-lengths(b1)+1);
-            %Randomly sample a start point
-            startPoints(b1) = randsample(inds, 1, true, weights(inds));
-        end
-    end
-    
     %Sample the block signs
-    blockSigns = sign(options.P.pPosBlock - rand(nBlocks, 1));
+    signs = sign(options.Pg.pPosBlock - rand(nBlocks, 1));
+    signs(1) = 1; % Make largest blocks +ve
     
-    %Sample the block weights
-    %blockWeights = options.P.minWeight ...
-    %    + gamrnd(options.P.weightRange.a, 1/options.P.weightRange.b, nBlocks, 1);
-    
-    %Add the blocks in
-    for bl = 1:nBlocks
-        endPoint = min(params.V, startPoints(bl)+lengths(bl)-1);
-        %Pblocks(startPoints(bl):endPoint, n) = blockSigns(bl) * blockWeights(bl);
-        Pblocks(startPoints(bl):endPoint, n) = blockSigns(bl) ...
-            * (gamrnd(options.P.weightRange.a, 1/options.P.weightRange.b, ...
-            lengths(bl), 1) + options.P.minWeight);
+    for b = 1:nBlocks
+        
+        %And put together
+        block.mode = n;
+        block.length = lengths(b);
+        block.weights = signs(b) * ones(block.length, 1);
+        
+        blocks{end+1} = block;
     end
     
 end
 
-%Finally, smooth the block maps with a box filter
-h = ones(options.P.smootherWidth,1) / options.P.smootherWidth;
-for n = 1:params.N
-    Pblocks(:,n) = conv(Pblocks(:,n), h, 'same');
+% Find the longest blocks
+lengths = zeros(length(blocks),1);
+for b = 1:length(blocks)
+    lengths(b) = blocks{b}.length;
+end
+[~,inds] = sort(lengths,1,'descend');
+
+% And reorder
+blocks = blocks(inds);
+
+% Now put into the maps
+usedBlocks = 0;
+while usedBlocks < length(blocks)
+    
+    % Take the blocks, from longest first, until they cover enough voxels
+    currentInds = []; currentVoxels = 0;
+    targetVoxels = params.V * options.Pg.biasStrength;
+    for b = (usedBlocks+1):length(blocks)
+        currentBlock = blocks{b};
+        if (currentVoxels + currentBlock.length) <= targetVoxels
+            currentInds(end+1) = b;
+            currentVoxels = currentVoxels + currentBlock.length;
+        else
+            break
+        end
+    end
+    currentInds = currentInds(randperm(length(currentInds)));
+    
+    % Simulate the gaps between blocks
+    % Dirichlet
+    gaps = gamrnd(1, 1, length(currentInds)+1, 1);
+    gaps = gaps / sum(gaps);
+    gaps = gaps * (params.V - currentVoxels);
+    gaps = floor(gaps);
+    
+    % And put together
+    start = 1 + gaps(1);
+    for b = 1:length(currentInds)
+        block = blocks{currentInds(b)};
+        Pblocks(start:start+block.length-1, block.mode) = block.weights;
+        start = start + block.length + gaps(b+1);
+    end
+    
+    usedBlocks = usedBlocks + length(currentInds);
 end
 
 Pg = Pblocks;
@@ -455,6 +391,55 @@ function [ Ps ] = generateAdditiveMaps_PsNull(params, options, Pg, plotFigures)
 Ps = cell(params.S, 1);
 for s = 1:params.S
     Ps{s} = zeros(params.V, params.N);
+end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [ Ps ] = generateProbabilisticMaps_PsDoubleGamma(params, options, Pg, plotFigures)
+%Generates subject maps following a double-Gamma distribution
+%
+% options.Ps.p - probability subject voxel is not drawn from group distribution
+% options.Ps.minWeight - allows a minimum map weight to be specified
+% options.Ps.weightRange.a - gamma weight shape parameter
+% options.Ps.weightRange.b - gamma weight rate parameter
+% options.Ps.weightRange.b - gamma weight rate parameter
+% options.Ps.epsilon - Gaussian noise for zero weights
+
+if plotFigures
+    %Plot the weight distribution
+    gamMode = max(1, (options.Ps.weightRange.a-1)/options.Ps.weightRange.b);
+    x = linspace(0, 5*gamMode, 500);
+    p = gampdf(x, options.Ps.weightRange.a, 1/options.Ps.weightRange.b);
+    
+    figure; plot(x+options.Ps.minWeight, p);
+    hold on; plot(-x-options.Ps.minWeight, p);
+    xlim([-x(end) x(end)]); xlabel('x'); ylabel('p(x)')
+    title('DoubleGamma: distribution of map weights')
+    
+end
+
+%Block weight params
+shape = options.Ps.weightRange.a;
+scale = 1.0 / options.Ps.weightRange.b;
+
+% Sample the subject maps
+Ps = cell(params.S, 1);
+for s = 1:params.S
+    Ps{s} = options.Ps.epsilon * randn(params.V, params.N);
+    for v = 1:params.V
+        for n = 1:params.N
+            
+            change = (rand() < options.Ps.p);
+            if (Pg(v,n) ~= 0 && ~change) || (Pg(v,n) == 0 && change)
+                % Pg(v,n) gives sign too
+                sign = Pg(v,n) + change;
+                Ps{s}(v,n) = sign * (gamrnd(shape, scale) + options.Ps.minWeight);
+            end
+            
+        end
+    end
 end
 
 end
