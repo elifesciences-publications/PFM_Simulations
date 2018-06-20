@@ -157,6 +157,11 @@ for s = 1:params.S
             %Downsample at TR
             A(n,:) = interp1(tn, An_hrf, t, 'pchip');
             
+            % Add post-HRF non-Gaussianity to help out temporal ICA
+            if options.BS.nongaussian == 1;
+                A(n,:) = Fleishman(A(n,:));
+            end
+            
         end
         
         %Multiply by spatial maps to get voxelwise signal

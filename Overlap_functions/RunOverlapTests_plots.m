@@ -1,23 +1,34 @@
 addpath /vols/Scratch/janineb/HCP/DMN/DMN_functions/hline_vline/
 addpath /vols/Scratch/janineb/matlab/
+addpath /vols/Scratch/janineb/HCP/DMN1200/Functions
 
 pfmPg = pfmPg1;
 [C12,munkres_assign] = spatialcorr(pfmPg,Pg);
 [i_pfm,j] = find(munkres_assign==1); sign_pfm = sign(C12(munkres_assign==1));
+pfmPg = pfmPg(:,i_pfm).*repmat(sign_pfm',atlasParams.V,1);
 pfmPg_new = pfmPg1_new;
 [C12,munkres_assign] = spatialcorr(pfmPg_new,Pg);
 [i_pfm_new,j] = find(munkres_assign==1); sign_pfm_new = sign(C12(munkres_assign==1));
+pfmPg_new = pfmPg_new(:,i_pfm_new).*repmat(sign_pfm_new',atlasParams.V,1);
 ticaPg = ticaP1{1};
 [C12,munkres_assign] = spatialcorr(ticaPg,Pg);
 [i_tica,j] = find(munkres_assign==1); sign_tica = sign(C12(munkres_assign==1));
+ticaPg = ticaPg(:,i_tica).*repmat(sign_tica',atlasParams.V,1);
 [C12,munkres_assign] = spatialcorr(sicaPg_new,Pg);
 [i_ica_new,j] = find(munkres_assign==1); sign_ica_new = sign(C12(munkres_assign==1));
-figure; set(gcf,'Position',[900 570 1000 415],'PaperPositionMode','auto')
-subplot(1,5,1); imagesc(Pg); title('ground truth group maps')
-subplot(1,5,2); imagesc(pfmPg(:,i_pfm).*repmat(sign_pfm',atlasParams.V,1)); title('PFM old group maps'); colormap parula
-subplot(1,5,3); imagesc(pfmPg_new(:,i_pfm_new).*repmat(sign_pfm_new',atlasParams.V,1)); title('PFM new group maps'); colormap parula
-subplot(1,5,4); imagesc(ticaPg(:,i_tica).*repmat(sign_tica',atlasParams.V,1)); title('tICA group maps'); colormap parula
-subplot(1,5,5); imagesc(sicaPg_new(:,i_ica_new).*repmat(sign_ica_new',atlasParams.V,1)); title('sICA melodic group maps'); colormap parula
+sicaPg_new = sicaPg_new(:,i_ica_new).*repmat(sign_ica_new',atlasParams.V,1);
+figure; set(gcf,'Position',[0 570 1900 415],'PaperPositionMode','auto')
+subplot(1,5,1); imagesc(Pg); title('ground truth group maps'); colormap parula; set(gca,'xtick',1:params.iN); grid on
+subplot(1,5,2); imagesc(pfmPg); title('PFM old group maps'); colormap parula; set(gca,'xtick',1:params.iN); grid on
+for n = 1:params.iN; r = corr(Pg(:,n),pfmPg(:,n)); h = text(n-0.1,atlasParams.V-0.05*atlasParams.V,sprintf('%1.2f',r)); set(h,'rotation',90); end
+subplot(1,5,3); imagesc(pfmPg_new); title('PFM new group maps'); colormap parula; set(gca,'xtick',1:params.iN); grid on
+for n = 1:params.iN; r = corr(Pg(:,n),pfmPg_new(:,n)); h = text(n-0.1,atlasParams.V-0.05*atlasParams.V,sprintf('%1.2f',r)); set(h,'rotation',90); end
+subplot(1,5,4); imagesc(ticaPg); title('tICA group maps'); colormap parula; set(gca,'xtick',1:params.iN); grid on
+for n = 1:params.iN; r = corr(Pg(:,n),ticaPg(:,n)); h = text(n-0.1,atlasParams.V-0.05*atlasParams.V,sprintf('%1.2f',r)); set(h,'rotation',90); end
+subplot(1,5,5); imagesc(sicaPg_new); title('sICA melodic group maps'); colormap parula; set(gca,'xtick',1:params.iN); grid on
+for n = 1:params.iN; r = corr(Pg(:,n),sicaPg_new(:,n)); h = text(n-0.1,atlasParams.V-0.05*atlasParams.V,sprintf('%1.2f',r)); set(h,'rotation',90); end
+print(gcf,'-dpng','-r300','Results/GroupMaps.png')
+
 GT_Snet = zeros(params.iN,params.iN,params.S);
 GT_Tnet = zeros(params.iN,params.iN,params.S);
 PFM_Snet = zeros(params.iN,params.iN,params.S);
@@ -47,7 +58,7 @@ A = ones(params.iN); A = triu(A,1); A = find(A);
 Pt = reshape(PFM_Tnet,params.iN*params.iN,params.S); Pt_new = reshape(PFMnew_Tnet,params.iN*params.iN,params.S);
 It = reshape(tICA_Tnet,params.iN*params.iN,params.S); It_new = reshape(sICAnew_Tnet,params.iN*params.iN,params.S);
 Gt = reshape(GT_Tnet,params.iN*params.iN,params.S);
-figure; set(gcf,'Position',[900 0 1000 455],'PaperPositionMode','auto')
+figure; set(gcf,'Position',[900 0 1000 700],'PaperPositionMode','auto')
 R = corr([Gt(A,:) Pt(A,:) Pt_new(A,:) It(A,:) It_new(A,:)]);
 imagesc(R,[-1 1]); colorbar; colormap parula
 hline([30.5 60.5 90.5 120.5],'k'); vline([30.5 60.5 90.5 120.5],'k')  
@@ -57,6 +68,7 @@ text(5,params.S*3+2,'ground truth - tICA'); r = R(1:params.S,params.S*3+1:params
 text(5,params.S*4+2,'ground truth - sICA melodic'); r = R(1:params.S,params.S*4+1:params.S*5); r = r(eye(params.S)==1); text(5,params.S*5-5,sprintf('mean r=%1.2f',mean(r)));
 set(gca,'ytick',15:30:params.S*5,'yticklabel',{'ground truth','PFM old','PFM new','tICA','sICA melodic'})
 title('Subject-level similarities of full netmats')
+print(gcf,'-dpng','-r300','Results/SubjectNets.png')
   
 % Plot group means
 figure; set(gcf,'Position',[0 0 900 955],'PaperPositionMode','auto')
@@ -70,14 +82,16 @@ subplot(5,2,7); imagesc(mean(tICA_Snet,3),[-0.5 0.5]); colorbar; title('tICA DR 
 subplot(5,2,8); imagesc(mean(tICA_Tnet,3),[-0.5 0.5]); colorbar; title('tICA DR temporal correlations (group mean)'); colormap parula
 subplot(5,2,9); imagesc(mean(sICAnew_Snet,3),[-0.5 0.5]); colorbar; title('sICA melodic DR spatial correlations (group mean)'); colormap parula
 subplot(5,2,10); imagesc(mean(sICAnew_Tnet,3),[-0.5 0.5]); colorbar; title('sICA melodic DR temporal correlations (group mean)'); colormap parula
+print(gcf,'-dpng','-r300','Results/GroupNets.png')
 
 % Plot scatter plots
 AllNets = cat(3,reshape(GT_Tnet,params.iN*params.iN,params.S)',reshape(PFMnew_Tnet,params.iN*params.iN,params.S)',reshape(sICAnew_Tnet,params.iN*params.iN,params.S)',...
-    reshape(GT_Snet,params.iN*params.iN,params.S)',reshape(PFMnew_Snet,params.iN*params.iN,params.S)',reshape(sICAnew_Snet,params.iN*params.iN,params.S)');
-AllNames = {'GT temporal net','PFM new temporal net','sICA melodic temporal net','GT spatial net','PFM new spatial net','sICA melodic spatial net'};
+    reshape(GT_Snet,params.iN*params.iN,params.S)',reshape(PFMnew_Snet,params.iN*params.iN,params.S)',reshape(sICAnew_Snet,params.iN*params.iN,params.S)',...
+    reshape(tICA_Tnet,params.iN*params.iN,params.S)',reshape(tICA_Snet,params.iN*params.iN,params.S)');
+AllNames = {'GT temporal net','PFM new temporal net','sICA melodic temporal net','GT spatial net','PFM new spatial net','sICA melodic spatial net','tICA temporal net','tICA spatial net'};
 A = ones(params.iN); A = triu(A,1); A = find(A==1); An = length(A);
 figure; set(gcf,'Position',[0 0 1900 955],'PaperPositionMode','auto')
-ns = [1 1 1 1 4 4 4 4 2 3]; ms = [2 3 5 6 5 6 2 3 5 6];
+ns = [1 4 1 1 1 4 4 4 1 4 2 3]; ms = [2 5 5 6 3 6 2 3 7 8 5 6];
 for i = 1:length(ns);
     subplot(3,4,i);
     scatplot(reshape(AllNets(:,A,ns(i)),params.S*An,1),reshape(AllNets(:,A,ms(i)),params.S*An,1)); 
@@ -87,28 +101,29 @@ for i = 1:length(ns);
     title(sprintf('r = %1.2f',r));
     hold on; if r>0; plot(-1:0.1:1,-1:0.1:1,'r'); else; plot(-1:0.1:1,1:-0.1:-1,'r'); end
 end
+print(gcf,'-dpng','-r300','Results/Scatter.png')
 
 %%% PLOT INDIVIDUAL MAPS
-Pg_norm = Pg;
-Pg_norm = Pg_norm.*repmat(sign(mean(Pg_norm)),size(Pg_norm,1),1)./repmat(max(abs(Pg_norm)),size(Pg_norm,1),1);
-pfmPg_new_norm = pfmPg_new;
-pfmPg_new_norm = pfmPg_new_norm.*repmat(sign(mean(pfmPg_new_norm)),size(pfmPg_new_norm,1),1)./repmat(max(abs(pfmPg_new_norm)),size(pfmPg_new_norm,1),1);
-sicaPg_new_norm = sicaPg_new;
-sicaPg_new_norm = sicaPg_new_norm.*repmat(sign(mean(sicaPg_new_norm)),size(sicaPg_new_norm,1),1)./repmat(max(abs(sicaPg_new_norm)),size(sicaPg_new_norm,1),1);
-ticaPg_new_norm = ticaPg;
-ticaPg_new_norm = ticaPg_new_norm.*repmat(sign(mean(ticaPg_new_norm)),size(ticaPg_new_norm,1),1)./repmat(max(abs(ticaPg_new_norm)),size(ticaPg_new_norm,1),1);
-figure; set(gcf,'Position',[0 0 1900 955],'PaperPositionMode','auto')
-[~,M] = max(sum(abs(Pg),2));
-for n = 1:15
-    subplot(3,5,n);
-    plot(sicaPg_new_norm(:,i_ica_new(n)),'g','linewidth',2); 
-    hold on
-    plot(ticaPg_new_norm(:,i_ica_new(n)),'m','linewidth',2);
-    plot(pfmPg_new_norm(:,i_pfm_new(n)),'r','linewidth',2);
-    plot(Pg_norm(:,n),'linewidth',2); 
-    vline(M); hold off
-end
-legend({'sICA new','tICA','PFM new','ground truth'})
+% Pg_norm = Pg;
+% Pg_norm = Pg_norm.*repmat(sign(mean(Pg_norm)),size(Pg_norm,1),1)./repmat(max(abs(Pg_norm)),size(Pg_norm,1),1);
+% pfmPg_new_norm = pfmPg_new;
+% pfmPg_new_norm = pfmPg_new_norm.*repmat(sign(mean(pfmPg_new_norm)),size(pfmPg_new_norm,1),1)./repmat(max(abs(pfmPg_new_norm)),size(pfmPg_new_norm,1),1);
+% sicaPg_new_norm = sicaPg_new;
+% sicaPg_new_norm = sicaPg_new_norm.*repmat(sign(mean(sicaPg_new_norm)),size(sicaPg_new_norm,1),1)./repmat(max(abs(sicaPg_new_norm)),size(sicaPg_new_norm,1),1);
+% ticaPg_new_norm = ticaPg;
+% ticaPg_new_norm = ticaPg_new_norm.*repmat(sign(mean(ticaPg_new_norm)),size(ticaPg_new_norm,1),1)./repmat(max(abs(ticaPg_new_norm)),size(ticaPg_new_norm,1),1);
+% figure; set(gcf,'Position',[0 0 1900 955],'PaperPositionMode','auto')
+% [~,M] = max(sum(abs(Pg),2));
+% for n = 1:15
+%     subplot(3,5,n);
+%     plot(sicaPg_new_norm(:,i_ica_new(n)),'g','linewidth',2); 
+%     hold on
+%     plot(ticaPg_new_norm(:,i_tica(n)),'m','linewidth',2);
+%     plot(pfmPg_new_norm(:,i_pfm_new(n)),'r','linewidth',2);
+%     plot(Pg_norm(:,n),'linewidth',2); 
+%     vline(M); hold off
+% end
+% legend({'sICA new','tICA','PFM new','ground truth'})
 
 % %%% SAME PLOTS BUT REMOVING EMPTY PFM maps
 % PFMempty = find(sum(abs(pfmPg_new))<10); PFMgood = setdiff(1:params.iN,PFMempty); Ngood = length(PFMgood);

@@ -5,10 +5,10 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'WeakSpatial_StrongTemporal';
+fileName = 'LowO_LowM_HighT2';
 No_overlap = false; 
 plot_SamFigures = false;
-plot_JanineFigures = true;
+plot_JanineFigures = false;
 
 %% Set paths
 restoredefaultpath
@@ -83,7 +83,7 @@ atlasOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
 
 % Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
-atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N);
+atlasOptions.P.registration.maxError = 0.5 * (atlasParams.V / atlasParams.N);
 % This parameter controls the size of misalignments
 % It represents the furthest one voxel can be moved by misregistration
 % Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
@@ -108,7 +108,7 @@ else
     % How big are the modes? On average, they cover `p * V` voxels
     % If we have N modes, then we expect `p * N` modes in every voxel
     % This is therefore a crude proxy for overlap
-    modeOptions.P.p = 1.0 / params.N;
+    modeOptions.P.p = 0.5 / params.N;
     modeOptions.P.pVar = 0.00075;
     % Increase this parameter to make blocks less likely to overlap (0.75)
     modeOptions.P.biasStrength = 0.9;
@@ -160,9 +160,9 @@ switch options.An.form
         % Increasing these parameters will increase the
         % strength of the correlations at the group,
         % subject and run level respectively
-        options.An.rot = 0.6; % 0.3
-        options.An.rotS = 0.6; % 0.5
-        options.An.rotR = 0.4; % 0.1
+        options.An.rot = 0.5; % 0.3
+        options.An.rotS = 0.7; % 0.5
+        options.An.rotR = 0.2; % 0.1
         options.An.p = 0.2;
         options.An.fc = 0.1; %in Hz
         options.An.fAmp = 2;
@@ -171,19 +171,21 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %BOLD signal
-options.BS.form = 'SaturatingFlobsHRF';
+options.BS.form = 'FlobsHRF';
 switch options.BS.form
     case 'Linear'
         
     case 'FlobsHRF'
         options.BS.HRFcoeffs.mu = [1 0 0];
         options.BS.HRFcoeffs.sigma = [0.1 0.1 0.1];
+        options.BS.nongaussian = 1;
         
     case 'SaturatingFlobsHRF'
         options.BS.HRFcoeffs.mu = [1 0 0];
         options.BS.HRFcoeffs.sigma = [0.1 0.1 0.1];
         options.BS.tanhPercentile = 99;
         options.BS.tanhMax = 0.9;
+        options.BS.nongaussian = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -290,7 +292,7 @@ for n = 1:params.nRepeats
     
     %Use the group and the subject specific maps to regress the timecourses
     %out of the BOLD signal (noise free)
-    A = cell(params.S,1); Ag = cell(params.S,1);
+     A = cell(params.S,1); Ag = cell(params.S,1);
     for s = 1:params.S
         A{s} = cell(params.R(s),1); Ag{s} = cell(params.R(s),1);
         for r = 1:params.R(s)
@@ -357,27 +359,27 @@ for n = 1:params.nRepeats
     Save_niftis(D,params,fileName,atlasParams);
     system(sprintf('sh Overlap_functions/ICA_PROFUMO.sh %1.2f %s %d %s',params.TR,fileName,params.iN,pwd))
 
-    %% Extract PFMs
-    
-    %For the first run, may want to plot convergence
-    if plotNow
-        %If we want to run with plots of convergence, pass in best guesses
-        %for mean map and node time courses
-        [pfmP1, pfmA1, pfmPg1] = runVBGP(D, params, params.iN, Pg, A);
-    else
-        %Just run VBGP normally
-        [pfmP1, pfmA1, pfmPg1] = runVBGP(D, params, params.iN);
-    end
-    
-    
-    %Save scores
-    scores.PFMs.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
-        makePA(pfmP1,pfmA1,params), params);
-    [scores.PFMs.P(:,2*(n-1)+1), scores.PFMs.A(:,2*(n-1)+1), ...
-        scores.PFMs.cP(:,2*(n-1)+1), scores.PFMs.cA(:,2*(n-1)+1)] ...
-        = calculateDecompositionAccuracy(P, pfmP1, A, pfmA1, params);
-    
-    
+%     %% Extract PFMs
+%     
+%     %For the first run, may want to plot convergence
+%     if plotNow
+%         %If we want to run with plots of convergence, pass in best guesses
+%         %for mean map and node time courses
+%         [pfmP1, pfmA1, pfmPg1] = runVBGP(D, params, params.iN, Pg, A);
+%     else
+%         %Just run VBGP normally
+%         [pfmP1, pfmA1, pfmPg1] = runVBGP(D, params, params.iN);
+%     end
+%     
+%     
+%     %Save scores
+%     scores.PFMs.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
+%         makePA(pfmP1,pfmA1,params), params);
+%     [scores.PFMs.P(:,2*(n-1)+1), scores.PFMs.A(:,2*(n-1)+1), ...
+%         scores.PFMs.cP(:,2*(n-1)+1), scores.PFMs.cA(:,2*(n-1)+1)] ...
+%         = calculateDecompositionAccuracy(P, pfmP1, A, pfmA1, params);
+%     
+%     
     %% Run PCA (using SVD)
     
     [pcaP, pcaA, svdU, svdS, svdV] = runPCA(D, params, params.iN);
@@ -474,18 +476,18 @@ for n = 1:params.nRepeats
         scores.stICA_DR.cP(:,2*(n-1)+1), scores.stICA_DR.cA(:,2*(n-1)+1)] ...
         = calculateDecompositionAccuracy(P, sticaP1_DR, A, sticaA1_DR, params);
     
+    %% Save results
+    save(sprintf('Results/PFMsims_atlas_%s',fileName),'-v7.3')
+    
     %% Load results from external runs of melodic and profumo
-    [sicaPg_new,sica_P1_DR_new,sica_A1_DR_new] = Melodic_DR(fileName,D,atlasParams,params);
+    [sicaPg_new,sica_P1_DR_new,sica_A1_DR_new,sica_P1_DR_thres,sica_A1_DR_thres] = Melodic_DR(fileName,D,atlasParams,params);
     [pfmPg1_new,pfmP1_new,pfmA1_new] = loadNewPROFUMO(fileName,params);
     
     %% Plot results
     if plot_JanineFigures
         RunOverlapTests_plots
     end
-    
-    %% Save results
-    save(sprintf('Results/PFMsims_atlas_%s',fileName),'-v7.3')
-    
+
 end
 
 %% Plot results
