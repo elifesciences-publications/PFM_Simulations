@@ -188,9 +188,9 @@ switch options.D.noise.form
         options.D.noise.b = 3.0;
         % Standard deviations of the respective subspaces
         options.D.noise.structuredStd = 1.0;
-        options.D.noise.unstructuredStd = 1.0;
+        options.D.noise.unstructuredStd = 4.0;
         % Rank of structured noise
-        options.D.noise.N = 20;
+        options.D.noise.N = 5;
 end
 
 
