@@ -127,9 +127,9 @@ for n = 1:length(Ins)
         Tnets(s,5,n) = corr(r(Ai),TG); clear a
         
         % mICA nets
-        p = mica_P1_DRnew{s}; [r,~] = spatialcorr(p(:,Orders(:,3,n)).*repmat(Signs(:,3,n)',atlasParams.V,1), p(:,Orders(:,3,n)).*repmat(Signs(:,3,n)',atlasParams.V,1)); 
+        p = mica_P1_DRnew{s}; [r,~] = spatialcorr(p(:,Orders(:,4,n)).*repmat(Signs(:,4,n)',atlasParams.V,1), p(:,Orders(:,4,n)).*repmat(Signs(:,4,n)',atlasParams.V,1)); 
         Snets(s,3,n) = corr(r(Ai),SG);
-        [r,~] = spatialcorr(p(:,Orders(:,3,n)).*repmat(Signs(:,3,n)',atlasParams.V,1),P{s}); 
+        [r,~] = spatialcorr(p(:,Orders(:,4,n)).*repmat(Signs(:,4,n)',atlasParams.V,1),P{s}); 
         Scorrs(s,:,3,n) = r(eye(params.iN)==1); clear p
         a = [micaA1{s}{1}'; micaA1{s}{2}']; 
         r = corr(a(:,Orders(:,4,n)).*repmat(Signs(:,4,n)',params.T*2,1),TSG); 
