@@ -5,7 +5,7 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'LowO_LowM_HighT2';
+fileName = 'original_withFleish';
 No_overlap = false; 
 plot_SamFigures = false;
 plot_JanineFigures = false;
@@ -85,7 +85,7 @@ atlasOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
 
 % Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
-atlasOptions.P.registration.maxError = 0.5 * (atlasParams.V / atlasParams.N);
+atlasOptions.P.registration.maxError = 2 * (atlasParams.V / atlasParams.N);
 % This parameter controls the size of misalignments
 % It represents the furthest one voxel can be moved by misregistration
 % Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
@@ -104,12 +104,12 @@ modeOptions.Pg.nBlocks = 1.25;
 % If we have N modes, then we expect `p * N` modes in every voxel
 % This is therefore a crude proxy for overlap
 %%% HighOverlap: 1.4; LowOverlap 1.2; %%%
-modeOptions.Pg.p = 1.2 / params.N;
+modeOptions.Pg.p = 1.3 / params.N;
 modeOptions.Pg.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
 % Increase this parameter to make blocks less likely to overlap
 % Between 0 and 1
 %%% HighOverlap: 0.5; LowOverlap 0.9; %%%
-modeOptions.Pg.biasStrength = 0.9;
+modeOptions.Pg.biasStrength = 0.75;
 % Proportion of (secondary) blocks that are positive
 modeOptions.Pg.pPosBlock = 0.7;
 
@@ -140,9 +140,9 @@ switch options.An.form
         % Increasing these parameters will increase the
         % strength of the correlations at the group,
         % subject and run level respectively
-        options.An.rot = 0.5; % 0.3
-        options.An.rotS = 0.7; % 0.5
-        options.An.rotR = 0.2; % 0.1
+        options.An.rot = 0.3; % 0.3
+        options.An.rotS = 0.5; % 0.5
+        options.An.rotR = 0.1; % 0.1
         options.An.p = 0.2;
         options.An.fc = 0.1; %in Hz
         options.An.fAmp = 2;
@@ -165,7 +165,7 @@ switch options.BS.form
         options.BS.HRFcoeffs.sigma = [0.1 0.1 0.1];
         options.BS.tanhPercentile = 99;
         options.BS.tanhMax = 0.9;
-        options.BS.nongaussian = 0;
+        options.BS.nongaussian = 1;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -427,6 +427,22 @@ for n = 1:params.nRepeats
     %Run dual regression
     [ticaP1_DR, ticaA1_DR] = runDR(D, ticaA1, params);
     
+    %Traditional dual regression
+    addpath /usr/local/fmrib/fmt/
+    tica_P1_DRnew = cell(params.S,1);
+    tica_A1_DRnew = cell(params.S,1);
+    for s = 1:params.S
+        tica_A1_DRnew{s} = cell(params.R(s),1);
+        Ds = zeros(params.V, params.T*params.R(s));
+        M = zeros(atlasParams.V,params.iN,params.R(1));
+        for r = 1:params.R(s)
+            Ds(:, (r-1)*params.T+(1:params.T)) = D{s}{r};
+            tica_A1_DRnew{s}{r} = demean((pinv(demean(double(ticaP1{1})))*demean(double(D{s}{r})))');
+            M(:,:,r) = demean((pinv(demean(double(tica_A1_DRnew{s}{r})))*demean(double(D{s}{r}))')');
+        end
+        tica_P1_DRnew{s} = mean(M,3);
+    end
+    
     %Save scores
     scores.tICA_DR.PA(2*(n-1)+1) = calculateBoldRecovery(PA, ...
         makePA(ticaP1_DR,ticaA1_DR,params), params);
@@ -434,6 +450,44 @@ for n = 1:params.nRepeats
         scores.tICA_DR.cP(:,2*(n-1)+1), scores.tICA_DR.cA(:,2*(n-1)+1)] ...
         = calculateDecompositionAccuracy(P, ticaP1_DR, A, ticaA1_DR, params);
        
+    
+    %% Run Steve's spatio-temporal mixed ICA
+    addpath ~steve/matlab/
+    addpath ~steve/NETWORKS/FSLNets;
+    
+    % Concatenate data
+    Dmat = zeros(params.V, params.T*sum(params.R));
+    sr = 1;
+    for s = 1:params.S
+        for r = 1:params.R(s)
+            Dmat(:, (sr-1)*params.T+(1:params.T)) = D{s}{r};
+            sr = sr + 1;
+        end
+    end
+    
+    % Run spatio-temporal mixed ICA
+    [pcaU,pcaS,pcaV]=nets_svds(Dmat,params.iN);
+    Y1=pcaU'; Y2=pcaV';
+    [A1,S1,A2,S2,A12,S12] = mfastica(Y1,Y2,10);
+    
+    % Rearrange timecourses
+    mica_P1_DRnew = cell(params.S,1);
+    micaA1 = cell(params.S,1); sr = 1;
+    for s = 1:params.S
+        micaA1{s} = cell(params.R(s),1);
+        M = zeros(atlasParams.V,params.iN,params.R(1));
+        for r = 1:params.R(s)
+            micaA1{s}{r} = S12(:, (sr-1)*params.T+(1:params.T)+10000);
+            M(:,:,r) = demean((pinv(demean(double(micaA1{s}{r})'))*demean(double(D{s}{r}))')');
+            sr = sr + 1;
+        end
+        mica_P1_DRnew{s} = mean(M,3);
+    end
+    
+    % Get group maps
+    micaP1 = cell(1,1);
+    micaP1{1} = (A12'*Y1)';
+    
     %% Run sICA & tICA
     % sICA on high dim PCA, with dual reg, followed by tICA
     

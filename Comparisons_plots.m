@@ -3,11 +3,11 @@ clear all; close all; clc
 % Only works if simulations have the same number of voxels, subjects, and modes
 
 % Inputs to compare
-Ins = {'original','HighO_LowM_LowT','LowO_LowM_HighT','LowO_HighM_LowT'};
+Ins = {'HighO_LowM_LowT_newimproved','LowO_LowM_HighT_newimproved'};
 PFMnet = 'TS'; % 'PROFUMO' or 'TS' or 'DR'
 ICA_Snet = 'original'; % 'thres_Smap' or 'original'
 ICA_Tnet = 'original'; % 'thres_Gmap' or 'original'
-tICA = 'high_dimICA'; % 'high_dimICA' or 'low_dimPCA'
+tICA = 'mixed_ica'; % 'low_dimPCA_DR' or 'low_dimPCA_cut' or 'mixed_ica'
     
 % Set paths
 warning off
@@ -33,13 +33,19 @@ for n = 1:length(Ins)
     
     % Load data
     load(sprintf('Results/PFMsims_atlas_%s.mat',Ins{n}),...
-        'pfmPg1_new','Pg','ticaP1','P','A','sticaP1_DR','sticaA1_DR',...
-        'pfmP1_new','pfmA1_new','ticaP1_DR','ticaA1_DR',...
-        'D','atlasParams','params','P'); 
+        'Pg','P','A','D','atlasParams','params',...
+        'tica_P1_DRnew','tica_A1_DRnew','ticaP1','ticaA1',...
+        'micaP1','micaA1','mica_P1_DRnew'); 
     
-    if strcmp(tICA,'high_dimICA');
-        ticaP1_DR = sticaP1_DR;
-        ticaA1_DR = sticaA1_DR;
+    if strcmp(tICA,'low_dimPCA_cut');
+        ticaP1_DR = tica_P1_DRnew;
+        ticaA1_DR = ticaA1;
+    elseif strcmp(tICA,'low_dimPCA_DR')
+        ticaP1_DR = tica_P1_DRnew;
+        ticaA1_DR = tica_A1_DRnew;
+    elseif strcmp(tICA,'mixed_ica')
+        ticaP1_DR = mica_P1_DRnew;
+        ticaA1_DR = micaA1;       
     end
     
     % Rerun DR
@@ -55,7 +61,11 @@ for n = 1:length(Ins)
     pfmPg_new = pfmPg_new(:,i_pfm_new).*repmat(sign_pfm_new',atlasParams.V,1);
     GroupMaps(:,:,2,n) = pfmPg_new; Signs(:,2,n) = sign_pfm_new; Orders(:,2,n) = i_pfm_new;
     
-    ticaPg = ticaP1{1};
+    if strncmp(tICA,'low',3)
+        ticaPg = ticaP1{1};
+    elseif strncmp(tICA,'mix',3)
+        ticaPg = micaP1{1};
+    end
     [C12,munkres_assign] = spatialcorr(ticaPg,Pg);
     [i_tica,~] = find(munkres_assign==1); sign_tica = sign(C12(munkres_assign==1));
     ticaPg = ticaPg(:,i_tica).*repmat(sign_tica',atlasParams.V,1);
@@ -64,7 +74,7 @@ for n = 1:length(Ins)
     [C12,munkres_assign] = spatialcorr(sicaPg_new,Pg);
     [i_ica_new,~] = find(munkres_assign==1); sign_ica_new = sign(C12(munkres_assign==1));
     sicaPg_new = sicaPg_new(:,i_ica_new).*repmat(sign_ica_new',atlasParams.V,1);
-    GroupMaps(:,:,4,n) = ticaPg; Signs(:,4,n) = sign_ica_new; Orders(:,4,n) = i_ica_new;
+    GroupMaps(:,:,4,n) = sicaPg_new; Signs(:,4,n) = sign_ica_new; Orders(:,4,n) = i_ica_new;
     
     GroupMaps(:,:,1,n) = Pg;
     clear pfmPg_new C12 munkres_assign i_pfm_new sign_pfm_new ticaPg i_tica sign_tica i_ica_new sign_ica_new
@@ -167,12 +177,12 @@ for n = 1:length(Ins)
     
     subplot(length(Ins),3,(n-1)*3+2);
     r = corr(Tnets(:,:,1,n)',Tnets(:,:,3,n)'); imagesc(r,[-1 1]); colorbar; colormap parula
-    if n == 1; title(sprintf('Tnets %s',AllNames{3}),'color',[0.6 0 1],'interpreter','none'); end
+    if n == 1; title(sprintf('Tnets %s',AllNames{3}),'color','r','interpreter','none'); end
     r = r(eye(params.S)==1); xlabel(sprintf('mean r=%1.2f',mean(r)));
     
     subplot(length(Ins),3,(n-1)*3+3);
     r = corr(Tnets(:,:,1,n)',Tnets(:,:,4,n)'); imagesc(r,[-1 1]); colorbar; colormap parula
-    if n == 1; title(sprintf('Tnets %s (%s)',AllNames{4},ICA_Tnet),'color','r','interpreter','none'); end
+    if n == 1; title(sprintf('Tnets %s (%s)',AllNames{4},ICA_Tnet),'color',[0.6 0 1],'interpreter','none'); end
     r = r(eye(params.S)==1); xlabel(sprintf('mean r=%1.2f',mean(r)));   
 end
 print(gcf,'-dpng','-r300','Results/Comparison_TemporalNets.png')
@@ -192,13 +202,13 @@ for n = 1:length(Ins)
     subplot(length(Ins),3,(n-1)*3+2);
     Cn = reshape(Tnets(:,:,3,n),params.S*An,1); r = corr(Cg,Cn);
     scatplot(Cg,Cn); axis([-1 1 -1 1]); hold on; if r>0; plot(-1:0.1:1,-1:0.1:1,'r'); else plot(-1:0.1:1,1:-0.1:-1,'r'); end
-    if n == 1; title(sprintf('Tnets scatterplot: %s',AllNames{3}),'color',[0.6 0 1],'interpreter','none'); end
+    if n == 1; title(sprintf('Tnets scatterplot: %s',AllNames{3}),'color','r','interpreter','none'); end
     xlabel(sprintf('Ground Truth: r=%1.2f',r));
     
     subplot(length(Ins),3,(n-1)*3+3);
     Cn = reshape(Tnets(:,:,4,n),params.S*An,1); r = corr(Cg,Cn);
     scatplot(Cg,Cn); axis([-1 1 -1 1]); hold on; if r>0; plot(-1:0.1:1,-1:0.1:1,'r'); else plot(-1:0.1:1,1:-0.1:-1,'r'); end
-    if n == 1; title(sprintf('Tnets scatterplot: %s (%s)',AllNames{4},ICA_Tnet),'color','r','interpreter','none'); end
+    if n == 1; title(sprintf('Tnets scatterplot: %s (%s)',AllNames{4},ICA_Tnet),'color',[0.6 0 1],'interpreter','none'); end
     xlabel(sprintf('Ground Truth: r=%1.2f',r));
 end
 print(gcf,'-dpng','-r300','Results/Comparison_temporal_Scatter.png')
@@ -219,13 +229,13 @@ for n = 1:length(Ins)
     subplot(length(Ins),3,(n-1)*3+2);
     Cn = reshape(Snets(:,:,3,n),params.S*An,1); r = corr(Cg,Cn);
     scatplot(Cg,Cn); axis([-1 1 -1 1]); hold on; if r>0; plot(-1:0.1:1,-1:0.1:1,'r'); else plot(-1:0.1:1,1:-0.1:-1,'r'); end
-    if n == 1; title(sprintf('Snets scatterplot: %s',AllNames{3}),'color',[0.6 0 1],'interpreter','none'); end
+    if n == 1; title(sprintf('Snets scatterplot: %s',AllNames{3}),'color','r','interpreter','none'); end
     xlabel(sprintf('Snet r=%1.2f\n Subject map r=%1.2f',r,Scorrs(3,n)));
     
     subplot(length(Ins),3,(n-1)*3+3);
     Cn = reshape(Snets(:,:,4,n),params.S*An,1); r = corr(Cg,Cn);
     scatplot(Cg,Cn); axis([-1 1 -1 1]); hold on; if r>0; plot(-1:0.1:1,-1:0.1:1,'r'); else plot(-1:0.1:1,1:-0.1:-1,'r'); end
-    if n == 1; title(sprintf('Snets scatterplot: %s (%s)',AllNames{4},ICA_Snet),'color','r','interpreter','none'); end
+    if n == 1; title(sprintf('Snets scatterplot: %s (%s)',AllNames{4},ICA_Snet),'color',[0.6 0 1],'interpreter','none'); end
     xlabel(sprintf('Snet r=%1.2f\n Subject map r=%1.2f',r,Scorrs(4,n)));
 end
 print(gcf,'-dpng','-r300','Results/Comparison_spatial_Scatter.png')
