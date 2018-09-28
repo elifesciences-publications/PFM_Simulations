@@ -12,11 +12,11 @@ homedir=$4
 # Create file list for melodic
 rm ${homedir}/Results/input_filelist.txt
 for filename in `ls ${homedir}/Results/Temp/*_${Option}.nii.gz` ; do 
-	echo $filename >> ${homedir}/Results/input_filelist.txt
+	echo $filename >> ${homedir}/Results/input_filelist_${Option}.txt
 done
 
 # run melodic
-fsl_sub -l logfiles -N M_${Option} melodic -i ${homedir}/Results/input_filelist.txt  \
+fsl_sub -l logfiles -N M_${Option} melodic -i ${homedir}/Results/input_filelist_${Option}.txt  \
 -o ${homedir}/Results/Melodic_${Option}.gica --tr=${tr} --nobet --nomask -a concat --disableMigp -d ${dim}
 
 # run PROFUMO (need to make sure we're on jalapeno18)
