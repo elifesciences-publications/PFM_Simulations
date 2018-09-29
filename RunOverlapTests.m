@@ -68,7 +68,7 @@ params.iN = 15;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Atlas
 
-atlasOptions.P.form = 'Additive';
+atlasOptions.P.form = 'Probabilistic';
 
 %Choose form for Pg
 atlasOptions.Pg.form = 'BlockAtlas';
@@ -79,13 +79,21 @@ atlasOptions.Pg.widthPrecision = 25;
 atlasOptions.Pg.smootherWidth = 25.0;
 
 %Choose form for Ps
-%atlasOptions.Ps.form = 'Null';
-atlasOptions.Ps.form = 'Gaussian';
-atlasOptions.P.PsPg = 0.10; %Ratio of std(P{s}(:)-Pg(:)) / std(Pg(:))
+atlasOptions.Ps.form = 'WeightedGamma';
+% Probability subject voxel is not drawn from group distribution
+atlasOptions.Ps.p = 0.001;
+% Minimum weight - useful to make sure all weights are different from noise
+atlasOptions.Ps.minWeight = 0.1;
+% Weights are gamma(a,b) distributed (mean = a/b)
+% Increasing a,b makes them more stable
+atlasOptions.Ps.weightRange.a = 0.9 * 20.0;
+atlasOptions.Ps.weightRange.b = 20.0;
+% Little bit of Gaussian noise for old times sake
+atlasOptions.Ps.epsilon = 0.01;
 
 % Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
-atlasOptions.P.registration.maxError = 1 * (atlasParams.V / atlasParams.N);
+atlasOptions.P.registration.maxError = 0.75 * (atlasParams.V / atlasParams.N);
 % This parameter controls the size of misalignments
 % It represents the furthest one voxel can be moved by misregistration
 % Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
@@ -114,7 +122,7 @@ modeOptions.Pg.biasStrength = 0.75;
 modeOptions.Pg.pPosBlock = 0.7;
 
 %Choose form for Ps
-modeOptions.Ps.form = 'DoubleGamma';
+modeOptions.Ps.form = 'WeightedGamma';
 % Probability subject voxel is not drawn from group distribution
 % `p = c / (V * N)` means that, on average `c` parcels are active
 % in a given subject that were not in the group maps

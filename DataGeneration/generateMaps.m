@@ -63,8 +63,6 @@ switch options.Pg.form
         Pg = generateAdditiveMaps_PgSS(params, options, plotFigures);
     case 'Freq'
         Pg = generateAdditiveMaps_PgFreq(params, options, plotFigures);
-    case 'BlockAtlas'
-        Pg = generateAdditiveMaps_PgBlockAtlas(params, options, plotFigures);
     otherwise
         error('Not a recognised form for Pg')
 end
@@ -106,14 +104,16 @@ function [ P ] = generateProbabilisticMaps(params, options, plotFigures)
 switch options.Pg.form
     case 'BiasedBoxcar'
         Pg = generateProbabilisticMaps_PgBiasedBoxcar(params, options, plotFigures);
+    case 'BlockAtlas'
+        Pg = generateProbabilisticMaps_PgBlockAtlas(params, options, plotFigures);
     otherwise
         error('Not a recognised form for Pg')
 end
 
 %Generate subject maps
 switch options.Ps.form
-    case 'DoubleGamma'
-        P = generateProbabilisticMaps_PsDoubleGamma(params, options, Pg, plotFigures);
+    case 'WeightedGamma'
+        P = generateProbabilisticMaps_PsWeightedGamma(params, options, Pg, plotFigures);
     otherwise
         error('Not a recognised form for Ps')
 end
@@ -186,7 +186,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [ Pg ] = generateAdditiveMaps_PgBlockAtlas(params, options, plotFigures)
+function [ Pg ] = generateProbabilisticMaps_PgBlockAtlas(params, options, plotFigures)
 %Generates an atlas where activations are grouped in blocks
 %  Just divides the set of voxels into params.N non-overlapping regions.
 %  Region sizes are drawn from a Dirichlet distribution
@@ -397,13 +397,12 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [ Ps ] = generateProbabilisticMaps_PsDoubleGamma(params, options, Pg, plotFigures)
+function [ Ps ] = generateProbabilisticMaps_PsWeightedGamma(params, options, Pg, plotFigures)
 %Generates subject maps following a double-Gamma distribution
 %
 % options.Ps.p - probability subject voxel is not drawn from group distribution
 % options.Ps.minWeight - allows a minimum map weight to be specified
 % options.Ps.weightRange.a - gamma weight shape parameter
-% options.Ps.weightRange.b - gamma weight rate parameter
 % options.Ps.weightRange.b - gamma weight rate parameter
 % options.Ps.epsilon - Gaussian noise for zero weights
 
@@ -414,9 +413,8 @@ if plotFigures
     p = gampdf(x, options.Ps.weightRange.a, 1/options.Ps.weightRange.b);
     
     figure; plot(x+options.Ps.minWeight, p);
-    hold on; plot(-x-options.Ps.minWeight, p);
-    xlim([-x(end) x(end)]); xlabel('x'); ylabel('p(x)')
-    title('DoubleGamma: distribution of map weights')
+    xlim([-0.1 x(end)]); xlabel('x'); ylabel('p(x)')
+    title('WeightedGamma: distribution of map weights')
     
 end
 
@@ -427,15 +425,20 @@ scale = 1.0 / options.Ps.weightRange.b;
 % Sample the subject maps
 Ps = cell(params.S, 1);
 for s = 1:params.S
+    % Start with Gaussian noise
     Ps{s} = options.Ps.epsilon * randn(params.V, params.N);
+    % Weighted gamma
     for v = 1:params.V
         for n = 1:params.N
             
             change = (rand() < options.Ps.p);
             if (Pg(v,n) ~= 0 && ~change) || (Pg(v,n) == 0 && change)
-                % Pg(v,n) gives sign too
-                sign = Pg(v,n) + change;
-                Ps{s}(v,n) = sign * (gamrnd(shape, scale) + options.Ps.minWeight);
+                if change
+                    weight = 1.0;
+                else
+                    weight = Pg(v,n);
+                end
+                Ps{s}(v,n) = weight * (gamrnd(shape, scale) + options.Ps.minWeight);
             end
             
         end
