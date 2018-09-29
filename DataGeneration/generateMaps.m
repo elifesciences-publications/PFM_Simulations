@@ -237,7 +237,6 @@ function [ Pg ] = generateProbabilisticMaps_PgBiasedBoxcar(params, options, plot
 % options.Pg.p - expected sparsity of the maps
 % options.Pg.pVar - variance of this sparsity over networks
 % options.Pg.pPosBlock - proportion of blocks that are positive
-% options.Pg.biasStrength - how strong the exclusion bias is, in [0 1]
 
 %Random sparsity (overall number of voxels in the blocks) is Beta distributed
 %First recover the a and b parameters from the mean and variance
@@ -254,11 +253,8 @@ if plotFigures
     title('BiasedBoxcar: distribution of map sparsity')
 end
 
-%Generate empty maps
-blocks = {};
-Pblocks = zeros(params.V, params.N);
-
 %Generate the parameters of the blocks
+blocks = {};
 for n = 1:params.N
     
     %Generate a random number of blocks
@@ -296,50 +292,25 @@ for n = 1:params.N
     
 end
 
-% Find the longest blocks
+% Shuffle the blocks
+blocks = blocks(randperm(length(blocks)));
+
+% Place end-to-end
 lengths = zeros(length(blocks),1);
 for b = 1:length(blocks)
     lengths(b) = blocks{b}.length;
 end
-[~,inds] = sort(lengths,1,'descend');
-
-% And reorder
-blocks = blocks(inds);
+total_length = sum(lengths);
+start_points = [0; cumsum(lengths(1:end-1))];
+% And then shrink to fit to the number of voxels
+start_points = round(start_points / (total_length / params.V)) + 1;
 
 % Now put into the maps
-usedBlocks = 0;
-while usedBlocks < length(blocks)
-    
-    % Take the blocks, from longest first, until they cover enough voxels
-    currentInds = []; currentVoxels = 0;
-    targetVoxels = params.V * options.Pg.biasStrength;
-    for b = (usedBlocks+1):length(blocks)
-        currentBlock = blocks{b};
-        if (currentVoxels + currentBlock.length) <= targetVoxels
-            currentInds(end+1) = b;
-            currentVoxels = currentVoxels + currentBlock.length;
-        else
-            break
-        end
-    end
-    currentInds = currentInds(randperm(length(currentInds)));
-    
-    % Simulate the gaps between blocks
-    % Dirichlet
-    gaps = gamrnd(1, 1, length(currentInds)+1, 1);
-    gaps = gaps / sum(gaps);
-    gaps = gaps * (params.V - currentVoxels);
-    gaps = floor(gaps);
-    
-    % And put together
-    start = 1 + gaps(1);
-    for b = 1:length(currentInds)
-        block = blocks{currentInds(b)};
-        Pblocks(start:start+block.length-1, block.mode) = block.weights;
-        start = start + block.length + gaps(b+1);
-    end
-    
-    usedBlocks = usedBlocks + length(currentInds);
+Pblocks = zeros(params.V, params.N);
+for b = 1:length(blocks)
+    block = blocks{b};
+    start = start_points(b);
+    Pblocks(start:start+block.length-1, block.mode) = block.weights;
 end
 
 Pg = Pblocks;

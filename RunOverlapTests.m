@@ -53,7 +53,7 @@ atlasParams.V = 10000;     %Voxels
 atlasParams.N = 100;      %Number of nodes in the atlas
 
 modeParams.V = atlasParams.N;
-modeParams.N = 25;        %Number of modes
+modeParams.N = 15;        %Number of modes
 
 params.N = modeParams.N;
 params.V = atlasParams.V;
@@ -76,7 +76,7 @@ atlasOptions.Pg.form = 'BlockAtlas';
 % Smaller numbers give more variability in parcel sizes
 atlasOptions.Pg.widthPrecision = 25;
 % Post-hoc smoothing of maps (width, in voxels, of the filter)
-atlasOptions.Pg.smootherWidth = 25.0;
+atlasOptions.Pg.smootherWidth = 0.1 * (atlasParams.V / atlasParams.N);
 
 %Choose form for Ps
 atlasOptions.Ps.form = 'WeightedGamma';
@@ -93,7 +93,7 @@ atlasOptions.Ps.epsilon = 0.01;
 
 % Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
-atlasOptions.P.registration.maxError = 0.75 * (atlasParams.V / atlasParams.N);
+atlasOptions.P.registration.maxError = 1.0 * (atlasParams.V / atlasParams.N);
 % This parameter controls the size of misalignments
 % It represents the furthest one voxel can be moved by misregistration
 % Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
@@ -107,19 +107,15 @@ modeOptions.P.form = 'Probabilistic';
 
 modeOptions.Pg.form = 'BiasedBoxcar';
 % How many spatially contiguous blocks per mode? Follows `Poisson(nBlocks) + 1`
-modeOptions.Pg.nBlocks = 1.25;
+modeOptions.Pg.nBlocks = 0.75;
 % How big are the modes? On average, they cover `p * V` voxels
 % If we have N modes, then we expect `p * N` modes in every voxel
 % This is therefore a crude proxy for overlap
 %%% HighOverlap: 1.4; LowOverlap 1.2; %%%
-modeOptions.Pg.p = 1.2 / params.N;
+modeOptions.Pg.p = 1.25 / params.N;
 modeOptions.Pg.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
-% Increase this parameter to make blocks less likely to overlap
-% Between 0 and 1
-%%% HighOverlap: 0.5; LowOverlap 0.9; %%%
-modeOptions.Pg.biasStrength = 0.75;
 % Proportion of (secondary) blocks that are positive
-modeOptions.Pg.pPosBlock = 0.7;
+modeOptions.Pg.pPosBlock = 0.5;
 
 %Choose form for Ps
 modeOptions.Ps.form = 'WeightedGamma';
@@ -131,8 +127,8 @@ modeOptions.Ps.p = 5.0 / (modeParams.V * modeParams.N);
 modeOptions.Ps.minWeight = 0.0;
 % Weights are gamma(a,b) distributed (mean = a/b)
 % Increasing a,b makes them more stable
-modeOptions.Ps.weightRange.a = 2.0;
-modeOptions.Ps.weightRange.b = 2.0;
+modeOptions.Ps.weightRange.a = 5.0;
+modeOptions.Ps.weightRange.b = 5.0;
 % Little bit of Gaussian noise for old times sake
 modeOptions.Ps.epsilon = 0.01;
 
