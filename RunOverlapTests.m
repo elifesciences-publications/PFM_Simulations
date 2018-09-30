@@ -6,7 +6,7 @@ close all; clear all; clc
 
 % Inputs
 fileName = 'LowO_LowM_MedT_NoHighs';
-No_overlap = false;
+% No_overlap = false;
 plot_SamFigures = false;
 plot_JanineFigures = false;
 
@@ -81,7 +81,7 @@ atlasOptions.Pg.smootherWidth = 0.1 * (atlasParams.V / atlasParams.N);
 %Choose form for Ps
 atlasOptions.Ps.form = 'WeightedGamma';
 % Probability subject voxel is not drawn from group distribution
-atlasOptions.Ps.p = 0.001;
+atlasOptions.Ps.p = 0.005;
 % Minimum weight - useful to make sure all weights are different from noise
 atlasOptions.Ps.minWeight = 0.1;
 % Weights are gamma(a,b) distributed (mean = a/b)
@@ -206,7 +206,7 @@ while n <= params.nRepeats
     fprintf('Trying\n');
     
     %% Generate data
-    params.N = 25;
+%     params.N = 25;
     if plot_SamFigures && (n==1)
         plotNow = true;
     else
@@ -227,31 +227,32 @@ while n <= params.nRepeats
         plotMaps(P, params, options);
     end
     
-    % Remove maps that are too highly correlated
-    Snets = zeros(params.N,params.N,params.S);
-    for s = 1:params.S
-        r = corr(P{s}); r = triu(r,1);
-        Snets(:,:,s) = r;
-    end
-    Snets = mean(Snets,3);
-    x = find(abs(Snets)>0.2); [x,y] = ind2sub(size(Snets),x);
-    Modes_remove = unique(x);
-    if length(Modes_remove)<10;
-        X = setdiff(1:params.N,Modes_remove);
-        Nextra = 10-length(Modes_remove);
-        N = randperm(length(X)); N = N(1:Nextra);
-        Modes_remove = [Modes_remove; X(N)'];
-    end
-    Modes_keep = setdiff(1:params.N,Modes_remove);
-    for s = 1:params.S
-        P{s} = P{s}(:,Modes_keep);
-    end
-    params.N = 15;
+%     % Remove maps that are too highly correlated
+%     Snets = zeros(params.N,params.N,params.S);
+%     for s = 1:params.S
+%         r = corr(P{s}); r = triu(r,1);
+%         Snets(:,:,s) = r;
+%     end
+%     Snets = mean(Snets,3);
+%     x = find(abs(Snets)>0.2); [x,y] = ind2sub(size(Snets),x);
+%     Modes_remove = unique(x);
+%     if length(Modes_remove)<10;
+%         X = setdiff(1:params.N,Modes_remove);
+%         Nextra = 10-length(Modes_remove);
+%         N = randperm(length(X)); N = N(1:Nextra);
+%         Modes_remove = [Modes_remove; X(N)'];
+%     end
+%     Modes_keep = setdiff(1:params.N,Modes_remove);
+%     for s = 1:params.S
+%         P{s} = P{s}(:,Modes_keep);
+%     end
+%     params.N = 15;
+%
+%     if length(Modes_keep) == params.N
+%         
+%         fprintf('Succeeded (%d)\n',n);
+    if true
     
-    if length(Modes_keep) == params.N
-        
-        fprintf('Succeeded (%d)\n',n);
-        
         An = generateNeuralTimecourses(params, options, plotNow);
         
         PA = generateBoldSignal(P, An, params, options, plotNow);
