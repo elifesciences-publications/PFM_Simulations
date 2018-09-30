@@ -66,9 +66,9 @@ end
 function [ An ] = generateNeuralTimecourses_Freq(params, options, plotFigures)
 %Generates a set of sparse timecourses with enhanced low frequency content
 %
-% options.An.rot - amount of random rotations to induce correlations
-% options.An.rotS - amount of subject specific correlation
-% options.An.rotR - amount of scan specific correlation
+% options.An.Cg_dof - degrees of freedom of group Wishart correlation
+% options.An.Cs_dof - degrees of freedom of subject Wishart correlation
+% options.An.Cr_dof - degrees of freedom of run Wishart correlation
 % options.An.fc - frequency cut off in Hz
 % options.An.fAmp - amount to amplify frequencies less than fc by
 % options.An.p - proportion of map entries to retain
@@ -79,16 +79,15 @@ Fn = 1 / (2*params.dt);
 %Frequencies available
 f = linspace(0, Fn, floor(params.Tn/2)+1 );
 
-%Generate global rotation matrix
-An_Rot = eye(params.N) + options.An.rot*( rand(params.N) + rand(params.N) - 1 );
+%Generate global corr matrix
+Cg = corrcov(wishrnd(eye(params.N) / options.An.Cg_dof, options.An.Cg_dof));
 
 %Simulate the set of scans
 An = cell(params.S, 1);
 for s = 1:params.S
     
-    %Generate subject rotation matrix
-    An_RotS = eye(params.N) ...
-        + options.An.rotS*( rand(params.N) + rand(params.N) - 1 );
+    %Generate subject corr matrix
+    Cs = corrcov(wishrnd(eye(params.N) / options.An.Cs_dof, options.An.Cs_dof));
     
     An{s} = cell(params.R(s), 1);
     for r = 1:params.R(s)
@@ -120,11 +119,10 @@ for s = 1:params.S
         %Now invert - we should get a real time course back
         An{s}{r} = ifft( fAn' )';
         
-        %Generate subject rotation matrix
-        An_RotR = eye(params.N) ...
-        + options.An.rotR*( rand(params.N) + rand(params.N) - 1 );
+        %Generate run corr matrix
+        Cr = corrcov(wishrnd(eye(params.N) / options.An.Cr_dof, options.An.Cr_dof));
         %Rotate to induce correlations
-        An{s}{r} = An_Rot * (An_RotS * (An_RotR * An{s}{r}));
+        An{s}{r} = Cg * Cs * Cr * (An{s}{r} * An{s}{r}')^-0.5 * An{s}{r};
         
         %Assume timecourses are Gaussian and find expected value of
         %percentile given by p

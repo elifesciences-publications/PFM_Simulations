@@ -140,14 +140,14 @@ modeOptions.P.registration.form = 'Null';
 options.An.form = 'Freq';
 options.An.offRate = 0.05 * 1/params.N;
 switch options.An.form
-    case 'Freq';
-        % Increasing these parameters will increase the
+    case 'Freq'
+        % Reducing these parameters will increase the
         % strength of the correlations at the group,
         % subject and run level respectively
-        options.An.rot = 0.3; % 0.3
-        options.An.rotS = 0.5; % 0.5
-        options.An.rotR = 0.1; % 0.1
-        options.An.p = 0.2;
+        options.An.Cg_dof = 250;
+        options.An.Cs_dof = 500;
+        options.An.Cr_dof = 500;
+        options.An.p = 0.1;
         options.An.fc = 0.1; %in Hz
         options.An.fAmp = 2;
         options.An.epsilon = 0.1;
@@ -155,17 +155,17 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %BOLD signal
-options.BS.form = 'FlobsHRF';
+options.BS.form = 'SaturatingFlobsHRF';
 switch options.BS.form
     case 'Linear'
         
     case 'FlobsHRF'
-        options.BS.HRFcoeffs.mu = [1 0 0];
+        options.BS.HRFcoeffs.mu = [1 0 -0.2];
         options.BS.HRFcoeffs.sigma = [0.1 0.1 0.1];
-        options.BS.nongaussian = 1;
+        options.BS.nongaussian = 0;
         
     case 'SaturatingFlobsHRF'
-        options.BS.HRFcoeffs.mu = [1 0 0];
+        options.BS.HRFcoeffs.mu = [1 0 -0.2];
         options.BS.HRFcoeffs.sigma = [0.1 0.1 0.1];
         options.BS.tanhPercentile = 99;
         options.BS.tanhMax = 0.9;
