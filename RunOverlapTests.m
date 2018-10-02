@@ -81,7 +81,7 @@ atlasOptions.Pg.smootherWidth = 0.1 * (atlasParams.V / atlasParams.N);
 %Choose form for Ps
 atlasOptions.Ps.form = 'WeightedGamma';
 % Probability subject voxel is not drawn from group distribution
-atlasOptions.Ps.p = 0.005;
+atlasOptions.Ps.p = 0.0005;
 % Minimum weight - useful to make sure all weights are different from noise
 atlasOptions.Ps.minWeight = 0.1;
 % Weights are gamma(a,b) distributed (mean = a/b)
@@ -89,7 +89,7 @@ atlasOptions.Ps.minWeight = 0.1;
 atlasOptions.Ps.weightRange.a = 0.9 * 20.0;
 atlasOptions.Ps.weightRange.b = 20.0;
 % Little bit of Gaussian noise for old times sake
-atlasOptions.Ps.epsilon = 0.01;
+atlasOptions.Ps.epsilon = 0.025;
 
 % Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
@@ -107,12 +107,12 @@ modeOptions.P.form = 'Probabilistic';
 
 modeOptions.Pg.form = 'BiasedBoxcar';
 % How many spatially contiguous blocks per mode? Follows `Poisson(nBlocks) + 1`
-modeOptions.Pg.nBlocks = 0.75;
+modeOptions.Pg.nBlocks = 0.5;
 % How big are the modes? On average, they cover `p * V` voxels
 % If we have N modes, then we expect `p * N` modes in every voxel
 % This is therefore a crude proxy for overlap
 %%% HighOverlap: 1.4; LowOverlap 1.2; %%%
-modeOptions.Pg.p = 1.25 / params.N;
+modeOptions.Pg.p = 1.3 / params.N;
 modeOptions.Pg.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
 % Proportion of (secondary) blocks that are positive
 modeOptions.Pg.pPosBlock = 0.5;

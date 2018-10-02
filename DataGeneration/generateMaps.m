@@ -520,6 +520,8 @@ s = randi(params.S,1);
 figure; imagesc(P{s}, max(abs(Pg(:)))*[-1 1]);
 colorbar; colormap(bluewhitered)
 title(['Subject ' num2str(s) ' Map'])
+figure; plot(P{s})
+title(['Subject ' num2str(s) ' Map'])
 
 %Plot all the subject versions of one network
 Ps = NaN(params.V, params.S+1); n = randi(params.N,1);
