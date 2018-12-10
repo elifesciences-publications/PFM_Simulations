@@ -21,6 +21,6 @@ fsl_sub -l logfiles -N M_${Option} melodic -i ${homedir}/Results/input_filelist_
 
 # run PROFUMO (need to make sure we're on jalapeno18)
 nice -n 20 ~samh/bin/PROFUMO ${homedir}/Results/PFMsims_atlas_${Option}.json ${dim} \
-${homedir}/Results/PROFUMO_PFMsims_atlas_${Option} --useHRF ${tr} \
+${homedir}/Results/PROFUMO_PFMsims_atlas_${Option} --nThreads 18 --useHRF ${tr} \
 --hrfFile ~samh/PROFUMO/Scripts/DefaultHRF.phrf -d 0.05 > ${homedir}/Results/Output_PROFUMO_PFMsims_atlas_${Option}.txt
 

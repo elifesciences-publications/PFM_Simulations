@@ -5,7 +5,7 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'New_sims_HighM';
+fileName = 'New_sims_NoOverlap_NEWICA';
 % No_overlap = false;
 plot_SamFigures = false;
 plot_JanineFigures = false;
@@ -81,7 +81,7 @@ atlasOptions.Pg.smootherWidth = 0.1 * (atlasParams.V / atlasParams.N);
 %Choose form for Ps
 atlasOptions.Ps.form = 'WeightedGamma';
 % Probability subject voxel is not drawn from group distribution
-atlasOptions.Ps.p = 0.0005;
+atlasOptions.Ps.p = 0; %0.0005;
 % Minimum weight - useful to make sure all weights are different from noise
 atlasOptions.Ps.minWeight = 0.1;
 % Weights are gamma(a,b) distributed (mean = a/b)
@@ -112,7 +112,7 @@ modeOptions.Pg.nBlocks = 0.5;
 % If we have N modes, then we expect `p * N` modes in every voxel
 % This is therefore a crude proxy for overlap
 %%% HighOverlap: 1.4; LowOverlap 1.2; %%%
-modeOptions.Pg.p = 1.3 / params.N;
+modeOptions.Pg.p = 1 / params.N;
 modeOptions.Pg.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
 % Proportion of (secondary) blocks that are positive
 modeOptions.Pg.pPosBlock = 0.5;
@@ -122,7 +122,7 @@ modeOptions.Ps.form = 'WeightedGamma';
 % Probability subject voxel is not drawn from group distribution
 % `p = c / (V * N)` means that, on average `c` parcels are active
 % in a given subject that were not in the group maps
-modeOptions.Ps.p = 5.0 / (modeParams.V * modeParams.N);
+modeOptions.Ps.p = 0; %5.0 / (modeParams.V * modeParams.N);
 % Minimum weight - useful to make sure all weights are different from noise
 modeOptions.Ps.minWeight = 0.0;
 % Weights are gamma(a,b) distributed (mean = a/b)
@@ -218,9 +218,16 @@ while n <= params.nRepeats
     [modeP, plotMaps] = generateMaps(modeParams, modeOptions, plotNow);
     
     %Combine to make full maps
+    addpath('~steve/matlab/icasso122','~steve/matlab/FastICA_25');
+    addpath /vols/Scratch/janineb/HCP/DMN1200/Functions
     P = cell(params.S,1);
     for s = 1:params.S
         P{s} = atlasP{s} * modeP{s};
+        [icaS,icaA,icaW] = fastica(P{s}','approach','symm','g','tanh','epsilon',1e-11,'maxNumIterations',3000,'lastEig',15);
+        [C12,munkres_assign] = spatialcorr(icaS',P{1});
+        [i,j] = find(munkres_assign==1); C12 = sign(C12(munkres_assign==1));
+        icaS = icaS(i,:)'; icaS = icaS.*repmat(C12',size(icaS,1),1);
+        P{s} = icaS;
     end
     %Plot if requested
     if plotNow

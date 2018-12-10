@@ -1,14 +1,7 @@
-function [sicaPg_new,sica_P1_DR_new,sica_A1_DR_new,sica_P1_DR_thres,sica_A1_DR_thres_noO,sica_A1_DR_thres_withO] = Melodic_DR(filename,D,atlasParams,params,aggressive)
+function [sicaPg_new,sica_P1_DR_new,sica_A1_DR_new,sica_P1_DR_thres_median,sica_P1_DR_thres_null1,sica_P1_DR_thres_null2,sica_P1_DR_thres_intersect,sica_P1_DR_thres_null3,sica_A1_DR_thres_median,sica_A1_DR_thres_intersect,sica_A1_DR_thres_null1,sica_A1_DR_thres_null2,sica_A1_DR_thres_null3] = Melodic_DR(filename,D,atlasParams,params)
 
 addpath ~steve/NETWORKS/FSLNets;
 addpath ~/scratch/matlab/;
-
-% Which thresholds to use
-if aggressive == 1
-    THpos = 1; THneg = 4;
-elseif aggressive == 0
-    THpos = 3; THneg = 2;
-end
 
 % Load existing data and melodic group map
 sicaPg_new = read_avw(sprintf('Results/Melodic_%s.gica/melodic_IC.nii.gz',filename));
@@ -29,38 +22,67 @@ for s = 1:params.S
 end
 
 % Run triple regression after thresholding
-sica_P1_DR_thres = cell(params.S,1);
-sica_A1_DR_thres_noO = cell(params.S,1);
-sica_A1_DR_thres_withO = cell(params.S,1);
+sica_P1_DR_thres_median = cell(params.S,1);
+sica_P1_DR_thres_intersect = cell(params.S,1);
+sica_A1_DR_thres_median = cell(params.S,1);
+sica_A1_DR_thres_intersect = cell(params.S,1);
+sica_A1_DR_thres_null1 = cell(params.S,1);
+sica_P1_DR_thres_null1 = cell(params.S,1);
+sica_A1_DR_thres_null2 = cell(params.S,1);
+sica_P1_DR_thres_null2 = cell(params.S,1);
+sica_A1_DR_thres_null3 = cell(params.S,1);
+sica_P1_DR_thres_null3 = cell(params.S,1);
 
 for s = 1:params.S
     M = sica_P1_DR_new{s};
         
     % Apply mixture modelling to each map to threshold:
-    M1 = zeros(size(M));
+    M1 = zeros(size(M)); M2 = zeros(size(M));
+    M3a = zeros(size(M)); M3b = zeros(size(M)); M3c = zeros(size(M));
     for n = 1:size(M,2)
-        [~,thresh] = ggfit(M(:,n));
-        M1(M(:,n)<thresh(THneg),n) = M(M(:,n)<thresh(THneg),n);
-        M1(M(:,n)>thresh(THpos),n) = M(M(:,n)>thresh(THpos),n);
+        [stats,thresh] = ggfit(M(:,n));
+        M1(M(:,n)<thresh(2),n) = M(M(:,n)<thresh(2),n);
+        M1(M(:,n)>thresh(1),n) = M(M(:,n)>thresh(1),n);
+        M2(M(:,n)<thresh(4),n) = M(M(:,n)<thresh(4),n);
+        M2(M(:,n)>thresh(3),n) = M(M(:,n)>thresh(3),n);
+        Mnew = M(:,n)-stats.gaussian.mean;
+        Mnew = Mnew/stats.gaussian.std;
+        M3a(Mnew<-1,n) = Mnew(Mnew<-1);
+        M3a(Mnew>1,n) = Mnew(Mnew>1);
+        M3b(Mnew<-2,n) = Mnew(Mnew<-2);
+        M3b(Mnew>2,n) = Mnew(Mnew>2);
+        M3c(Mnew<-3,n) = Mnew(Mnew<-3);
+        M3c(Mnew>3,n) = Mnew(Mnew>3);
     end
-    sica_P1_DR_thres{s} = M1;
+    sica_P1_DR_thres_median{s} = M1;
+    sica_P1_DR_thres_intersect{s} = M2;
+    sica_P1_DR_thres_null1{s} = M3a;
+    sica_P1_DR_thres_null2{s} = M3b;
+    sica_P1_DR_thres_null3{s} = M3c;
+    clear M1 M2 M thres n M3a M3b M3c Mnew
     
-    % Remove overlap (again using mixture modelling to threshold):
-    M = M1;
-    O = sum(abs(M1),2); 
-    [~,thresh] = ggfit(O);
-    M1(O>thresh(3),:) = 0;
-    
-    % If a map is missing entirely, add it back in from the thresholded version:
-    if find(sum(M1)==0); M1(:,sum(M1)==0) = M(:,sum(M1)==0); end
+%     % Remove overlap (again using mixture modelling to threshold):
+%     M = M1;
+%     O = sum(abs(M1),2); 
+%     [~,thresh] = ggfit(O);
+%     M1(O>thresh(3),:) = 0;
+%     
+%     % If a map is missing entirely, add it back in from the thresholded version:
+%     if find(sum(M1)==0); M1(:,sum(M1)==0) = M(:,sum(M1)==0); end
     
     % Obtain timeseries via simple masking:
-    sica_A1_DR_thres_noO{s} = cell(params.R(s),1);
-    sica_A1_DR_thres_withO{s} = cell(params.R(s),1);
+    sica_A1_DR_thres_intersect{s} = cell(params.R(s),1);
+    sica_A1_DR_thres_median{s} = cell(params.R(s),1);
+    sica_A1_DR_thres_null1{s} = cell(params.R(s),1);
+    sica_A1_DR_thres_null2{s} = cell(params.R(s),1);
+    sica_A1_DR_thres_null3{s} = cell(params.R(s),1);
     for r = 1:params.R(1)
         %sica_A1_DR_thres{s}{r} = nets_demean((pinv(nets_demean(M)) * nets_demean(double(D{s}{r})))');
-        sica_A1_DR_thres_noO{s}{r} = nets_demean((M1'*nets_demean(double(D{s}{r})))');
-        sica_A1_DR_thres_withO{s}{r} = nets_demean((pinv(nets_demean(M)) * nets_demean(double(D{s}{r})))');
+        sica_A1_DR_thres_intersect{s}{r} = nets_demean((pinv(nets_demean(sica_P1_DR_thres_intersect{s})) * nets_demean(double(D{s}{r})))');
+        sica_A1_DR_thres_median{s}{r} = nets_demean((pinv(nets_demean(sica_P1_DR_thres_median{s})) * nets_demean(double(D{s}{r})))');
+        sica_A1_DR_thres_null1{s}{r} = nets_demean((pinv(nets_demean(sica_P1_DR_thres_null1{s})) * nets_demean(double(D{s}{r})))');
+        sica_A1_DR_thres_null2{s}{r} = nets_demean((pinv(nets_demean(sica_P1_DR_thres_null2{s})) * nets_demean(double(D{s}{r})))');
+        sica_A1_DR_thres_null3{s}{r} = nets_demean((pinv(nets_demean(sica_P1_DR_thres_null3{s})) * nets_demean(double(D{s}{r})))');
     end
 end
 

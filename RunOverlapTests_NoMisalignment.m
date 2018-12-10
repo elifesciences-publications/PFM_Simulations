@@ -5,7 +5,7 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'New_sims_HighM';
+fileName = 'New_sims_NoMisalignment';
 % No_overlap = false;
 plot_SamFigures = false;
 plot_JanineFigures = false;
@@ -93,7 +93,7 @@ atlasOptions.Ps.epsilon = 0.025;
 
 % Choose registration
 atlasOptions.P.registration.form = 'RandomSmooth';
-atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N);
+atlasOptions.P.registration.maxError = 0 * (atlasParams.V / atlasParams.N);
 % This parameter controls the size of misalignments
 % It represents the furthest one voxel can be moved by misregistration
 % Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
