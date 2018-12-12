@@ -1,6 +1,5 @@
-clear all; close all; clc
+function Paper_figure_new(Ins)
 
-Ins = {'New_sims_NoOverlap_NEWICA'}; %{'New_sims_HighM'};
 warning off
 
 % Set paths
