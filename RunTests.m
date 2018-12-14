@@ -5,33 +5,44 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'New_sims_NoOverlapICA';
-% No_overlap = false;
-plot_SamFigures = false;
-plot_JanineFigures = false;
+fileName = 'Simulations';
+overlap = true
+misalignment = true
+
+% Fix filename
+if ~overlap
+    fileName = strcat(fileName, '_NoOverlap');
+end
+if ~misalignment
+    fileName = strcat(fileName, '_NoMisalignment');
+end
+fileName
+
+% Plotting
+plotFigures = false;
 
 %% Set paths
+
 restoredefaultpath
-addpath(genpath('~samh/Documents/Code/Simulated_fMRI_Tests/'))
+
 addpath(genpath('~samh/Documents/Code/MATLAB/'))
-addpath(genpath('~samh/Documents/Code/Algorithms/'))
-addpath('~samh/Documents/Code/VBGP_Tests/')
+addpath(getenv('FSLDIR') + '/etc/matlab/')
+
+% Internal paths
 addpath('DataGeneration/');
 addpath('Methods/');
 addpath('Scoring/');
-addpath('Visualisation/')
+addpath('Visualisation/');
 addpath('Overlap_functions/');
-addpath('/opt/fmrib/fsl/etc/matlab/')
 
-rng('shuffle')
-if plot_SamFigures
-    prettyFigures()
+if plotFigures
+    prettyFigures();
 end
 
 %% Set size of problem
 
 %Number of times to repeat simulation / test cycle
-params.nRepeats =10;
+params.nRepeats = 10;
 
 %Details of scans
 params.S = 30;       %Subjects
@@ -46,22 +57,22 @@ params.Tn = ceil(1.25 * params.T * params.TR / params.dt);
 
 %% Set size of atlas / mode matrix
 
+% Atlas
 atlasParams = params;
-modeParams = params;
-
-atlasParams.V = 10000;     %Voxels
+atlasParams.V = 10000;    %Voxels
 atlasParams.N = 100;      %Number of nodes in the atlas
 
+% Modes
+modeParams = params;
 modeParams.V = atlasParams.N;
 modeParams.N = 15;        %Number of modes
 
+% And store appropriate values for combined maps
 params.N = modeParams.N;
 params.V = atlasParams.V;
 
 %Number of modes to infer
 params.iN = 15;
-%params.iN = 25
-%params.iN = 40
 
 %% Set the details of the tests we want to do
 
@@ -81,7 +92,11 @@ atlasOptions.Pg.smootherWidth = 0.1 * (atlasParams.V / atlasParams.N);
 %Choose form for Ps
 atlasOptions.Ps.form = 'WeightedGamma';
 % Probability subject voxel is not drawn from group distribution
-atlasOptions.Ps.p = 0; %0.0005;
+if overlap
+    atlasOptions.Ps.p = 0.0005;
+else
+    atlasOptions.Ps.p = 0.0;
+end
 % Minimum weight - useful to make sure all weights are different from noise
 atlasOptions.Ps.minWeight = 0.1;
 % Weights are gamma(a,b) distributed (mean = a/b)
@@ -92,13 +107,17 @@ atlasOptions.Ps.weightRange.b = 20.0;
 atlasOptions.Ps.epsilon = 0.025;
 
 % Choose registration
-atlasOptions.P.registration.form = 'RandomSmooth';
-atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N);
-% This parameter controls the size of misalignments
-% It represents the furthest one voxel can be moved by misregistration
-% Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
-% average parcel size. The parameter `c` then represents the max
-% misalignment in terms of number of parcels rather than voxels.
+if misalignment
+    atlasOptions.P.registration.form = 'RandomSmooth';
+    atlasOptions.P.registration.maxError = 1.5 * (atlasParams.V / atlasParams.N);
+    % This parameter controls the size of misalignments
+    % It represents the furthest one voxel can be moved by misregistration
+    % Useful to express this in terms of `c * (atlas.V / atlas.N)`, i.e. the
+    % average parcel size. The parameter `c` then represents the max
+    % misalignment in terms of number of parcels rather than voxels.
+else
+    atlasOptions.P.registration.form = 'Null';
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Modes
@@ -112,7 +131,11 @@ modeOptions.Pg.nBlocks = 0.5;
 % If we have N modes, then we expect `p * N` modes in every voxel
 % This is therefore a crude proxy for overlap
 %%% HighOverlap: 1.4; LowOverlap 1.2; %%%
-modeOptions.Pg.p = 1 / params.N;
+if overlap
+    modeOptions.Pg.p = 1.3 / params.N;
+else
+    modeOptions.Pg.p = 1.0 / params.N;
+end
 modeOptions.Pg.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
 % Proportion of (secondary) blocks that are positive
 modeOptions.Pg.pPosBlock = 0.5;
@@ -122,7 +145,11 @@ modeOptions.Ps.form = 'WeightedGamma';
 % Probability subject voxel is not drawn from group distribution
 % `p = c / (V * N)` means that, on average `c` parcels are active
 % in a given subject that were not in the group maps
-modeOptions.Ps.p = 0; %5.0 / (modeParams.V * modeParams.N);
+if overlap
+    modeOptions.Ps.p = 2.0 / (modeParams.V * modeParams.N);
+else
+    modeOptions.Ps.p = 0.0;
+end
 % Minimum weight - useful to make sure all weights are different from noise
 modeOptions.Ps.minWeight = 0.0;
 % Weights are gamma(a,b) distributed (mean = a/b)
@@ -199,13 +226,17 @@ end
 
 
 %% Run the tests
+
 n=1;
+rng('shuffle')
+
 while n <= params.nRepeats
     
-    fileNameN = sprintf('%s_%02d',fileName,n);
+    fileNameN = sprintf('%s_%02d', fileName, n);
     
     %% Generate data
-    if plot_SamFigures && (n==1)
+    
+    if plotFigures && (n==1)
         plotNow = true;
     else
         plotNow = false;
@@ -216,21 +247,27 @@ while n <= params.nRepeats
     [modeP, plotMaps] = generateMaps(modeParams, modeOptions, plotNow);
     
     %Combine to make full maps
-    addpath('~steve/matlab/icasso122','~steve/matlab/FastICA_25');
-    addpath /vols/Scratch/janineb/HCP/DMN1200/Functions
     P = cell(params.S,1);
     for s = 1:params.S
         P{s} = atlasP{s} * modeP{s};
-        [icaS,icaA,icaW] = fastica(P{s}','approach','symm','g','tanh','epsilon',1e-11,'maxNumIterations',3000,'lastEig',15);
-        [C12,munkres_assign] = spatialcorr(icaS',P{1});
-        [i,j] = find(munkres_assign==1); C12 = sign(C12(munkres_assign==1));
-        icaS = icaS(i,:)'; icaS = icaS.*repmat(C12',size(icaS,1),1);
-        P{s} = icaS;
     end
     %Plot if requested
     if plotNow
         plotMaps(P, params, options);
     end
+    
+%     %Combine to make full maps
+%     addpath('~steve/matlab/icasso122','~steve/matlab/FastICA_25');
+%     addpath /vols/Scratch/janineb/HCP/DMN1200/Functions
+%     P = cell(params.S,1);
+%     for s = 1:params.S
+%         P{s} = atlasP{s} * modeP{s};
+%         [icaS,icaA,icaW] = fastica(P{s}','approach','symm','g','tanh','epsilon',1e-11,'maxNumIterations',3000,'lastEig',15);
+%         [C12,munkres_assign] = spatialcorr(icaS',P{1});
+%         [i,j] = find(munkres_assign==1); C12 = sign(C12(munkres_assign==1));
+%         icaS = icaS(i,:)'; icaS = icaS.*repmat(C12',size(icaS,1),1);
+%         P{s} = icaS;
+%     end
     
     if true
     
@@ -239,7 +276,6 @@ while n <= params.nRepeats
         PA = generateBoldSignal(P, An, params, options, plotNow);
         
         D = generateData(PA, params, options, plotNow);
-        
         
         %Finally, add a global rescaling such that all scans are overall
         %unit variance
@@ -256,6 +292,10 @@ while n <= params.nRepeats
                 PA{s}{r} = PA{s}{r} / sqrt(vD);
             end
         end
+        
+        %% Look at ground truth accuracy in the PA subspace
+        % This looks at how well the linear mixing model can do, in the best
+        % case scenario
         
         %Extract mean group map
         Pg = 0;
@@ -290,21 +330,32 @@ while n <= params.nRepeats
                 P, repmat({Pg}, params.S, 1), A, Ag, params);
         end
         
-        
-        %% Save nifti's and run latest versions of melodic and profumo
+        %% Save NIFTIs and run latest versions of MELODIC and PROFUMO
         
         Save_niftis(D,params,fileNameN,atlasParams);
         system(sprintf('sh Overlap_functions/ICA_PROFUMO.sh %1.2f %s %d %s',params.TR,fileNameN,params.iN,pwd))
         
         %% Save results
-        clear Ds pcaA pcaP pcaS pcaU pcaV S1 S2 S12 svdS svdU svdV Y1 Y2 A1 A12 A2
-        save(sprintf('Results/PFMsims_atlas_%s',fileNameN),'Pg','P','A','D','atlasParams','params','scores','-v7.3')
+        save(sprintf('Results/PFMsims_atlas_%s',fileNameN), ...
+            'P', 'Pg', 'A', 'D', ...
+            'atlasParams', 'modeParams', 'params', 'scores', ...
+            '-v7.3')
+        
+        %%
         n = n+1;
         
     else
         fprintf('Failed\n');
         
     end
+end
+
+%% Plot results
+
+if plotFigures
+    plotScores(scores, params);
+    input('Press return to continue')
+    close all
 end
 
 % When finished - run next script to produce figure for paper
