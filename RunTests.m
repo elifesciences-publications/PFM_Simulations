@@ -26,7 +26,7 @@ plotFigures = false;
 restoredefaultpath
 
 addpath(genpath('~samh/Documents/Code/MATLAB/'))
-addpath(getenv('FSLDIR') + '/etc/matlab/')
+addpath(strcat(getenv('FSLDIR'), '/etc/matlab/'))
 
 % Internal paths
 addpath('DataGeneration/');
@@ -231,7 +231,7 @@ rng('shuffle')
 
 for n = 1:params.nRepeats
     
-    fileNameN = sprintf('%s_%02d', fileName, n);
+    fileNameN = sprintf('%s_%02d', fileName, n)
     
     %% Generate data
     
