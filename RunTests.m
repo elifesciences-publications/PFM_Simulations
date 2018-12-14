@@ -134,7 +134,7 @@ modeOptions.Pg.nBlocks = 0.5;
 if overlap
     modeOptions.Pg.p = 1.3 / params.N;
 else
-    modeOptions.Pg.p = 1.0 / params.N;
+    modeOptions.Pg.p = 0.95 / params.N;
 end
 modeOptions.Pg.pVar = 0.01 ^ 2; % i.e. p will vary over approximately +/- 2.0 * sqrt(pVar)
 % Proportion of (secondary) blocks that are positive
