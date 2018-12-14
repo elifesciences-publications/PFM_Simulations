@@ -171,7 +171,7 @@ switch options.An.form
         % Reducing these parameters will increase the
         % strength of the correlations at the group,
         % subject and run level respectively
-        options.An.Cg_dof = 250; 
+        options.An.Cg_dof = 250;
         options.An.Cs_dof = 500;
         options.An.Cr_dof = 500;
         options.An.p = 0.1;
@@ -227,10 +227,9 @@ end
 
 %% Run the tests
 
-n=1;
 rng('shuffle')
 
-while n <= params.nRepeats
+for n = 1:params.nRepeats
     
     fileNameN = sprintf('%s_%02d', fileName, n);
     
@@ -269,85 +268,76 @@ while n <= params.nRepeats
 %         P{s} = icaS;
 %     end
     
-    if true
+    An = generateNeuralTimecourses(params, options, plotNow);
     
-        An = generateNeuralTimecourses(params, options, plotNow);
-        
-        PA = generateBoldSignal(P, An, params, options, plotNow);
-        
-        D = generateData(PA, params, options, plotNow);
-        
-        %Finally, add a global rescaling such that all scans are overall
-        %unit variance
-        vD = 0;
-        for s = 1:params.S
-            for r = 1:params.R(s)
-                vD = vD + var(D{s}{r}(:));
-            end
+    PA = generateBoldSignal(P, An, params, options, plotNow);
+    
+    D = generateData(PA, params, options, plotNow);
+    
+    %Finally, add a global rescaling such that all scans are overall
+    %unit variance
+    vD = 0;
+    for s = 1:params.S
+        for r = 1:params.R(s)
+            vD = vD + var(D{s}{r}(:));
         end
-        vD = vD / sum(params.R);
-        for s = 1:params.S
-            for r = 1:params.R(s)
-                D{s}{r} = D{s}{r} / sqrt(vD);
-                PA{s}{r} = PA{s}{r} / sqrt(vD);
-            end
-        end
-        
-        %% Look at ground truth accuracy in the PA subspace
-        % This looks at how well the linear mixing model can do, in the best
-        % case scenario
-        
-        %Extract mean group map
-        Pg = 0;
-        for s = 1:params.S
-            Pg = Pg + P{s};
-        end
-        Pg = Pg / params.S;
-        
-        %Use the group and the subject specific maps to regress the timecourses
-        %out of the BOLD signal (noise free)
-        A = cell(params.S,1); Ag = cell(params.S,1);
-        for s = 1:params.S
-            A{s} = cell(params.R(s),1); Ag{s} = cell(params.R(s),1);
-            for r = 1:params.R(s)
-                Ag{s}{r} = Pg \ PA{s}{r};
-                A{s}{r} = P{s} \ PA{s}{r};
-            end
-        end
-        
-        %Save scores
-        %Ground truth linear model
-        scores.GT.PA(n) = calculateBoldRecovery(PA, makePA(P,A,params), params);
-        
-        %Ground truth mean map model
-        scores.GTg.PA(n) = calculateBoldRecovery(PA, ...
-            makePA(repmat({Pg},params.S,1),Ag,params), params);
-        
-        %Mean map accuracy (if we are trying to find the true number of modes)
-        if params.N == params.iN
-            [scores.GTg.P(:,n), scores.GTg.A(:,n), scores.GTg.cP(:,n), ...
-                scores.GTg.cA(:,n)] = calculateDecompositionAccuracy( ...
-                P, repmat({Pg}, params.S, 1), A, Ag, params);
-        end
-        
-        %% Save NIFTIs and run latest versions of MELODIC and PROFUMO
-        
-        Save_niftis(D,params,fileNameN,atlasParams);
-        system(sprintf('sh Overlap_functions/ICA_PROFUMO.sh %1.2f %s %d %s',params.TR,fileNameN,params.iN,pwd))
-        
-        %% Save results
-        save(sprintf('Results/PFMsims_atlas_%s',fileNameN), ...
-            'P', 'Pg', 'A', 'D', ...
-            'atlasParams', 'modeParams', 'params', 'scores', ...
-            '-v7.3')
-        
-        %%
-        n = n+1;
-        
-    else
-        fprintf('Failed\n');
-        
     end
+    vD = vD / sum(params.R);
+    for s = 1:params.S
+        for r = 1:params.R(s)
+            D{s}{r} = D{s}{r} / sqrt(vD);
+            PA{s}{r} = PA{s}{r} / sqrt(vD);
+        end
+    end
+    
+    %% Look at ground truth accuracy in the PA subspace
+    % This looks at how well the linear mixing model can do, in the best
+    % case scenario
+    
+    %Extract mean group map
+    Pg = 0;
+    for s = 1:params.S
+        Pg = Pg + P{s};
+    end
+    Pg = Pg / params.S;
+    
+    %Use the group and the subject specific maps to regress the timecourses
+    %out of the BOLD signal (noise free)
+    A = cell(params.S,1); Ag = cell(params.S,1);
+    for s = 1:params.S
+        A{s} = cell(params.R(s),1); Ag{s} = cell(params.R(s),1);
+        for r = 1:params.R(s)
+            Ag{s}{r} = Pg \ PA{s}{r};
+            A{s}{r} = P{s} \ PA{s}{r};
+        end
+    end
+    
+    %Save scores
+    %Ground truth linear model
+    scores.GT.PA(n) = calculateBoldRecovery(PA, makePA(P,A,params), params);
+    
+    %Ground truth mean map model
+    scores.GTg.PA(n) = calculateBoldRecovery(PA, ...
+        makePA(repmat({Pg},params.S,1),Ag,params), params);
+    
+    %Mean map accuracy (if we are trying to find the true number of modes)
+    if params.N == params.iN
+        [scores.GTg.P(:,n), scores.GTg.A(:,n), scores.GTg.cP(:,n), ...
+            scores.GTg.cA(:,n)] = calculateDecompositionAccuracy( ...
+            P, repmat({Pg}, params.S, 1), A, Ag, params);
+    end
+    
+    %% Save simulated data
+    save(sprintf('Results/PFMsims_atlas_%s',fileNameN), ...
+        'P', 'Pg', 'A', 'D', ...
+        'atlasParams', 'modeParams', 'params', 'scores', ...
+        '-v7.3')
+    
+    %% Save NIFTIs and run latest versions of MELODIC and PROFUMO
+    
+    Save_niftis(D,params,fileNameN,atlasParams);
+    system(sprintf('sh Overlap_functions/ICA_PROFUMO.sh %1.2f %s %d %s',params.TR,fileNameN,params.iN,pwd))
+    
 end
 
 %% Plot results
@@ -360,5 +350,3 @@ end
 
 % When finished - run next script to produce figure for paper
 Paper_figure_new({fileName});
-
-
