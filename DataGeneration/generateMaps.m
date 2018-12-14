@@ -488,6 +488,8 @@ end
 
 function [ ] = plotMaps(P, params, options)
 
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 %Plot the mean map
 Pg = 0;
 for s = 1:params.S
@@ -515,6 +517,8 @@ xlim([1 params.V]); xlabel('Voxel')
 ylabel('Sum, over networks, of mean map')
 title('Fluctuations in spatial overlap')
 
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 %Plot one subject map
 s = randi(params.S,1);
 figure; imagesc(P{s}, max(abs(Pg(:)))*[-1 1]);
@@ -522,6 +526,13 @@ colorbar; colormap(bluewhitered)
 title(['Subject ' num2str(s) ' Map'])
 figure; plot(P{s})
 title(['Subject ' num2str(s) ' Map'])
+
+%Spatial correlations
+cP = P{s}'*P{s};
+dcP = sqrt( diag(cP) );
+cP = cP ./ (dcP * dcP');
+figure; imagesc(cP, [-1 1]); colorbar; colormap(bluewhitered)
+title(['Correlations in subject ' num2str(s) ' map'])
 
 %Plot all the subject versions of one network
 Ps = NaN(params.V, params.S+1); n = randi(params.N,1);
@@ -533,6 +544,8 @@ figure; imagesc(Ps, max(abs(Pg(:)))*[-1 1]);
 colorbar; colormap(bluewhitered)
 %export_fig('SubjectMaps', '-pdf', '-nocrop', '-transparent')
 title(['Subject versions of network ' num2str(n) ' map'])
+
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 % Look at how similar subject maps are to each other and the mean map
 cP = Pg;
@@ -560,6 +573,8 @@ end
 figure; TwoColourTufteHist(PsPs(:), 'xlim', [-1 1], 'normalise');
 xlabel('Correlation'); ylabel('Relative Frequency')
 title('Subject map - subject map correlations')
+
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 input('Press return to continue')
 close all
