@@ -3,12 +3,12 @@
 This simulation framework has been used as part of the following two
 publications:
 
- + `[Harrison-2015](/tags/Harrison-2015)`:
+ + `Harrison-2015`:
    Harrison et al., 'Large-scale Probabilistic Functional Modes from resting
    state fMRI', NeuroImage, 2015.
    DOI: [10.1016/j.neuroimage.2015.01.013](https://doi.org/10.1016/j.neuroimage.2015.01.013)
 
- + `[Bijsterbosch-2018](/tags/Bijsterbosch-2018)`:
+ + `Bijsterbosch-2018`:
    Bijsterbosch et al., 'The relationship between spatial configuration and
    functional connectivity of brain regions revisited', bioRxiv, 2018.
    DOI: [10.1101/520502](https://doi.org/10.1101/520502)
