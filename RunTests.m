@@ -171,9 +171,9 @@ switch options.An.form
         % Reducing these parameters will increase the
         % strength of the correlations at the group,
         % subject and run level respectively
-        options.An.Cg_dof = 250;
-        options.An.Cs_dof = 500;
-        options.An.Cr_dof = 500;
+        options.An.Cg_dof =  75;
+        options.An.Cs_dof = 150;
+        options.An.Cr_dof = 250;
         options.An.p = 0.1;
         options.An.fc = 0.1; %in Hz
         options.An.fAmp = 2;
