@@ -11,26 +11,25 @@ function [ Pscore, Ascore, cPscore, cAscore ] ...
 % truth
 
 %Calculate the map accuracies first
+%Take cosine similarity between true and inferred maps
 cP = 0;
 for s = 1:params.S
-    %Take correlations between true and inferred maps
     cP = cP + [P{s} infP{s}]' * [P{s} infP{s}];
 end
-%Normalise
-dcP = sqrt( diag(cP) ); cP = cP ./ (dcP * dcP');
+cP = corrcov(cP);
 %Just the scores between the two
 cP = cP( 1:params.N, params.N+(1:params.iN) );
 
 %Repeat for the temporal accuracy
+%Take correlation between true and inferred time courses
 cA = 0;
 for s = 1:params.S
     for r = 1:params.R(s)
-        %Take correlations between true and inferred time courses
-        cA = cA + [A{s}{r}; infA{s}{r}] * [A{s}{r}; infA{s}{r}]';
+        cA = cA + cov([A{s}{r}; infA{s}{r}]');
     end
 end
 %Normalise
-dcA = sqrt( diag(cA) ); cA = cA ./ (dcA * dcA');
+cA = corrcov(cA);
 %Just the scores between the two
 cA = cA( 1:params.N, params.N+(1:params.iN) );
 
@@ -58,19 +57,19 @@ cPscore = NaN(params.S, N*(N-1)/2);
 %Find the scores for each subjects corrcoef accuracy
 for s = 1:params.S
     
-    %Find correlations of real and observed maps
+    %Find z-scored cosine similarity of real and observed maps
     cP = P{s}(:,iGT)' * P{s}(:,iGT);
-    infcP = signs' * (infP{s}(:,iInf)' * infP{s}(:,iInf)) * signs;
+    cPz = r2z(corrcov(cP));
     
-    dcP = sqrt( diag(cP) ); cP = cP ./ (dcP * dcP');
-    dinfcP = sqrt( diag(infcP) ); infcP = infcP ./ (dinfcP * dinfcP');
+    infcP = signs' * (infP{s}(:,iInf)' * infP{s}(:,iInf)) * signs;
+    infcPz = r2z(corrcov(infcP));
     
     %Now look at how similar the matrices are
-    cP = cP(triu(ones(N),1)==1);
-    infcP = infcP(triu(ones(N),1)==1);
+    cPz = cPz(triu(ones(N),1)==1);
+    infcPz = infcPz(triu(ones(N),1)==1);
     
     %Save the RMS error between the correlation matrices
-    cPscore(s,:) = (cP-infcP).^2;
+    cPscore(s,:) = (cPz - infcPz).^2;
     
 end
 
@@ -80,21 +79,21 @@ cAscore = NaN(params.S, N*(N-1)/2);
 %Find the scores for each subjects corrcoef accuracy
 for s = 1:params.S
     
+    %Find z-scored correlations of real and observed timecourses
     cA = 0; infcA = 0;
     for r = 1:params.R(s)
-        %Find correlations of real and observed timecourses
-        cA = cA + A{s}{r}(iGT,:) * A{s}{r}(iGT,:)';
-        infcA = infcA + signs * (infA{s}{r}(iInf,:) * infA{s}{r}(iInf,:)') * signs';
+        cA = cA + cov(A{s}{r}(iGT,:)');
+        infcA = infcA + signs * cov(infA{s}{r}(iInf,:)') * signs';
     end
-    dcA = sqrt( diag(cA) ); cA = cA ./ (dcA * dcA');
-    dinfcA = sqrt( diag(infcA) ); infcA = infcA ./ (dinfcA * dinfcA');
+    cAz = r2z(corrcov(cA));
+    infcAz = r2z(corrcov(infcA));
     
     %Now look at how similar the matrices are
-    cA = cA(triu(ones(N),1)==1);
-    infcA = infcA(triu(ones(N),1)==1);
+    cAz = cAz(triu(ones(N),1)==1);
+    infcAz = infcAz(triu(ones(N),1)==1);
     
     %Save the RMS error between the correlation matrices
-    cAscore(s,:) = (cA-infcA).^2;
+    cAscore(s,:) = (cAz - infcAz).^2;
     
 end
 

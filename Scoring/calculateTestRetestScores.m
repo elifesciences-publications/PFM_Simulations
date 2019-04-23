@@ -6,10 +6,9 @@ function [ Pscore1, Pscore2 ] = calculateTestRetestScores( infP1, infP2, params 
 cPtotal = 0;
 for s = 1:params.S
     
-    %Take correlations between real and observed maps
+    %Take cosine similarity between real and observed maps
     cP = [infP1{s} infP2{s}]' * [infP1{s} infP2{s}];
-    dcP = sqrt( diag(cP) );
-    cP = cP ./ (dcP * dcP');
+    cP = corrcov(cP);
     %Just the scores between the two
     cP = cP( 1:params.iN, params.iN+(1:params.iN) );
     cPtotal = cPtotal + cP;
