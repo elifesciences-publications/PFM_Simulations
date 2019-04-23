@@ -255,19 +255,6 @@ for n = 1:params.nRepeats
         plotMaps(P, params, options);
     end
     
-%     %Combine to make full maps
-%     addpath('~steve/matlab/icasso122','~steve/matlab/FastICA_25');
-%     addpath /vols/Scratch/janineb/HCP/DMN1200/Functions
-%     P = cell(params.S,1);
-%     for s = 1:params.S
-%         P{s} = atlasP{s} * modeP{s};
-%         [icaS,icaA,icaW] = fastica(P{s}','approach','symm','g','tanh','epsilon',1e-11,'maxNumIterations',3000,'lastEig',15);
-%         [C12,munkres_assign] = spatialcorr(icaS',P{1});
-%         [i,j] = find(munkres_assign==1); C12 = sign(C12(munkres_assign==1));
-%         icaS = icaS(i,:)'; icaS = icaS.*repmat(C12',size(icaS,1),1);
-%         P{s} = icaS;
-%     end
-    
     An = generateNeuralTimecourses(params, options, plotNow);
     
     PA = generateBoldSignal(P, An, params, options, plotNow);
