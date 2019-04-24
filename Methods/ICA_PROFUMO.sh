@@ -18,7 +18,7 @@ done
 fsl_sub -l logfiles -N M_$(basename $basefilename) \
     melodic -i ${nifti_dir}/MELODIC_SpecFile.txt \
     -o ${basefilename}_MELODIC.gica \
-    --tr=${TR} --nobet --nomask -a concat --disableMigp -d ${dim}
+    --tr=${TR} --nobet --nomask -a concat -d ${dim}
 
 # run PROFUMO (need to make sure we're on jalapeno18)
 nice -n 20 ~samh/bin/PROFUMO \
