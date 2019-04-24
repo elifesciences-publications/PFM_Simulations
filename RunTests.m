@@ -5,7 +5,7 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'Simulations';
+fileName = 'Results/Simulations';
 overlap = true
 misalignment = true
 
@@ -30,6 +30,7 @@ addpath(strcat(getenv('FSLDIR'), '/etc/matlab/'))
 
 % Internal paths
 addpath('DataGeneration/');
+addpath('IO/');
 addpath('Methods/');
 addpath('Scoring/');
 addpath('Visualisation/');
@@ -231,7 +232,7 @@ rng('shuffle')
 
 for n = 1:params.nRepeats
     
-    fileNameN = sprintf('%s_%02d', fileName, n)
+    repeat = sprintf('%02d', n)
     
     %% Generate data
     
@@ -315,15 +316,21 @@ for n = 1:params.nRepeats
     end
     
     %% Save simulated data
-    save(sprintf('Results/PFMsims_atlas_%s',fileNameN), ...
+    
+    save([fileName '_' repeat '.mat'], ...
         'P', 'Pg', 'A', 'D', ...
         'atlasParams', 'modeParams', 'params', 'scores', ...
         '-v7.3')
     
     %% Save NIFTIs and run latest versions of MELODIC and PROFUMO
     
-    Save_niftis(D,params,fileNameN,atlasParams);
-    system(sprintf('sh Overlap_functions/ICA_PROFUMO.sh %1.2f %s %d %s',params.TR,fileNameN,params.iN,pwd))
+    niftiDir = [fileName '_' repeat '_NIfTIs/'];
+    mkdir(niftiDir)
+    saveNIfTIs(D, params, niftiDir);
+    
+    system(sprintf( ...
+        'sh Overlap_functions/ICA_PROFUMO.sh %s %s %d %1.2f', ...
+        [fileName '_' repeat], niftiDir, params.iN, params.TR))
     
 end
 
