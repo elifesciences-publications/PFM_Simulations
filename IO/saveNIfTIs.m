@@ -1,4 +1,4 @@
-function Save_niftis(D, params, directory)
+function saveNIfTIs(D, params, directory)
 
 addpath('IO/saveJSONfile/')
 

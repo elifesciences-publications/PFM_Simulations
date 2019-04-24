@@ -329,7 +329,7 @@ for n = 1:params.nRepeats
     saveNIfTIs(D, params, niftiDir);
     
     system(sprintf( ...
-        'sh Overlap_functions/ICA_PROFUMO.sh %s %s %d %1.2f', ...
+        'sh Methods/ICA_PROFUMO.sh %s %s %d %1.2f', ...
         [fileName '_' repeat], niftiDir, params.iN, params.TR))
     
 end
@@ -343,4 +343,8 @@ if plotFigures
 end
 
 % When finished - run next script to produce figure for paper
-Paper_figure_new({fileName});
+%Paper_figure_new({fileName});
+
+%% If run from the command line make sure we quit MATLAB
+
+exit
