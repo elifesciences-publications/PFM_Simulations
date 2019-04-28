@@ -5,18 +5,18 @@
 close all; clear all; clc
 
 % Inputs
-fileName = 'Results/Simulations';
+baseFileName = 'Results/Simulations';
 overlap = true
 misalignment = true
 
 % Fix filename
 if ~overlap
-    fileName = strcat(fileName, '_NoOverlap');
+    baseFileName = strcat(baseFileName, '_NoOverlap');
 end
 if ~misalignment
-    fileName = strcat(fileName, '_NoMisalignment');
+    baseFileName = strcat(baseFileName, '_NoMisalignment');
 end
-fileName
+baseFileName
 
 % Plotting
 plotFigures = false;
@@ -233,6 +233,7 @@ rng('shuffle')
 for n = 1:params.nRepeats
     
     repeat = sprintf('%02d', n)
+    repeatFileName = [baseFileName '_' repeat];
     
     %% Generate data
     
@@ -317,25 +318,26 @@ for n = 1:params.nRepeats
     
     %% Save simulated data
     
-    save([fileName '_' repeat '.mat'], ...
+    save([repeatFileName '.mat'], ...
         'P', 'Pg', 'A', 'D', ...
         'atlasParams', 'modeParams', 'params', 'scores', ...
         '-v7.3')
     
     %% Save NIFTIs and run latest versions of MELODIC and PROFUMO
     
-    niftiDir = [fileName '_' repeat '_NIfTIs/'];
+    niftiDir = [repeatFileName '_NIfTIs/'];
     mkdir(niftiDir)
     saveNIfTIs(D, params, niftiDir);
     
     system(sprintf( ...
         'sh Methods/MELODIC.sh %s %s %d %1.2f', ...
-        [fileName '_' repeat], niftiDir, params.iN, params.TR))
-    icadrPg = loadMELODIC([fileName '_' repeat], params);
+        repeatFileName, niftiDir, params.iN, params.TR));
+    
+    icadrPg = loadMELODIC(repeatFileName, params);
     
     system(sprintf( ...
         'sh Methods/PROFUMO.sh %s %s %d %1.2f', ...
-        [fileName '_' repeat], niftiDir, params.iN, params.TR))
+        repeatFileName, niftiDir, params.iN, params.TR));
     
 end
 
@@ -348,7 +350,7 @@ if plotFigures
 end
 
 % When finished - run next script to produce figure for paper
-%Paper_figure_new({fileName});
+%Paper_figure_new({baseFileName});
 
 %% If run from the command line make sure we quit MATLAB
 
