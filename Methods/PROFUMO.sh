@@ -14,5 +14,5 @@ nice -n 20 ~samh/bin/PROFUMO \
     ${dim} \
     ${basefilename}_PROFUMO.pfm \
     --useHRF ${TR} --hrfFile ~samh/PROFUMO/Scripts/DefaultHRF.phrf \
-    --nThreads 15 -d 0.5 \
+    --lowRankData 150 -d 0.5 --nThreads 15 \
     > ${basefilename}_PROFUMO_Output.txt
