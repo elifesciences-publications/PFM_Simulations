@@ -79,14 +79,17 @@ cAscore = NaN(params.S, N*(N-1)/2);
 %Find the scores for each subjects corrcoef accuracy
 for s = 1:params.S
     
-    %Find z-scored correlations of real and observed timecourses
+    %Find z-scored partial correlations of real and observed timecourses
     cA = 0; infcA = 0;
     for r = 1:params.R(s)
         cA = cA + cov(A{s}{r}(iGT,:)');
         infcA = infcA + signs * cov(infA{s}{r}(iInf,:)') * signs';
     end
-    cAz = r2z(corrcov(cA));
-    infcAz = r2z(corrcov(infcA));
+    % Tikhonov regularised partials
+    cA = inv( corrcov(cA) + 0.01 * eye(N) );
+    cAz = r2z(- corrcov(cA));
+    infcA = inv( corrcov(infcA) + 0.01 * eye(N) );
+    infcAz = r2z(- corrcov(infcA));
     
     %Now look at how similar the matrices are
     cAz = cAz(triu(ones(N),1)==1);
