@@ -13,5 +13,6 @@ TR=$4
 melodic -i ${nifti_dir}/MELODIC_SpecFile.txt \
     -o ${basefilename}_MELODIC.gica \
     --tr=${TR} -a concat -d ${dim} \
-    --migpN=300 --nobet --nomask --verbose \
+    --migpN=300 --nobet --nomask \
+    --maxrestart=5 --verbose \
     > ${basefilename}_MELODIC_Output.txt
