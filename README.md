@@ -15,6 +15,11 @@ publications:
 
 The main script is [RunTests.m](RunTests.m).
 
+```shell
+module load MATLAB/current  # Requires MATLAB >= R2016b
+matlab -nodesktop -nosplash -r RunTests
+```
+
 ----------
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
