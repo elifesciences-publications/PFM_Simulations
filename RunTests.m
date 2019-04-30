@@ -166,7 +166,8 @@ modeOptions.P.registration.form = 'Null';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Time courses
 options.An.form = 'Freq';
-options.An.offRate = 0.05 * 1/params.N;
+%options.An.offRate = 0.05 * 1/params.N;
+options.An.offRate = 0.0;
 switch options.An.form
     case 'Freq'
         % Reducing these parameters will increase the
