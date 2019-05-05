@@ -8,6 +8,8 @@ close all; clear all; clc
 baseFileName = 'Results/Simulations';
 overlap = true
 misalignment = true
+temporalCorrelations = true
+structuredNoise = true
 
 % Fix filename
 if ~overlap
@@ -15,6 +17,12 @@ if ~overlap
 end
 if ~misalignment
     baseFileName = strcat(baseFileName, '_NoMisalignment');
+end
+if ~temporalCorrelations
+    baseFileName = strcat(baseFileName, '_NoTemporalCorrelations');
+end
+if ~structuredNoise
+    baseFileName = strcat(baseFileName, '_NoStructuredNoise');
 end
 baseFileName
 
@@ -49,7 +57,7 @@ params.nRepeats = 10;
 params.S = 30;       %Subjects
 params.R = 2*ones(params.S,1);   %Runs
 
-params.T = 600;     %No. of time points per fMRI scan
+params.T  = 600;     %No. of time points per fMRI scan
 params.TR = 0.72;
 params.dt = 0.1;     %Neural sampling rate
 %Amount of neural points to simulate - more than scan length so don't have
@@ -173,9 +181,15 @@ switch options.An.form
         % Reducing these parameters will increase the
         % strength of the correlations at the group,
         % subject and run level respectively
-        options.An.Cg_dof =  75;
-        options.An.Cs_dof = 150;
-        options.An.Cr_dof = 250;
+        if temporalCorrelations
+            options.An.Cg_dof =  75;
+            options.An.Cs_dof = 150;
+            options.An.Cr_dof = 250;
+        else
+            options.An.Cg_dof = 1.0e5;
+            options.An.Cs_dof = 1.0e5;
+            options.An.Cr_dof = 1.0e5;
+        end
         options.An.p = 0.1;
         options.An.fc = 0.1; %in Hz
         options.An.fAmp = 2;
@@ -208,7 +222,11 @@ end
 options.D.SNR = 0.1;
 
 %Type
-options.D.noise.form = 'StructuredTdist';
+if structuredNoise
+    options.D.noise.form = 'StructuredTdist';
+else
+    options.D.noise.form = 'SpatiotemporallyWhiteTdist';
+end
 switch options.D.noise.form
     case 'SpatiotemporallyWhiteGaussian'
         
