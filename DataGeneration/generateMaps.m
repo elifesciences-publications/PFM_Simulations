@@ -215,7 +215,7 @@ for n = 1:params.N
 end
 
 %Finally, smooth the block maps with a box filter
-h = ones(options.Pg.smootherWidth,1) / options.Pg.smootherWidth;
+h = ones(round(options.Pg.smootherWidth), 1) / options.Pg.smootherWidth;
 for n = 1:params.N
     Pg(:,n) = conv(Pg(:,n), h, 'same');
 end
