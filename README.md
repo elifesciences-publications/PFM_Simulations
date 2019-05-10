@@ -10,8 +10,8 @@ publications:
 
  + `Bijsterbosch-2018`:
    Bijsterbosch et al., 'The relationship between spatial configuration and
-   functional connectivity of brain regions revisited', bioRxiv, 2018.
-   DOI: [10.1101/520502](https://doi.org/10.1101/520502)
+   functional connectivity of brain regions revisited', eLife, 2019.
+   DOI: [10.7554/eLife.44890](http://dx.doi.org/10.7554/eLife.44890)
 
 The main script is [RunTests.m](RunTests.m).
 
